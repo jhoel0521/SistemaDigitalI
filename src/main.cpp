@@ -211,6 +211,7 @@ void enviarEstadoWebSocket()
     zonaObj["nombre"] = zonas[i].nombre;
     zonaObj["activo"] = zonas[i].activo;
     zonaObj["manual"] = zonas[i].manual;
+    zonaObj["movimiento"] = digitalRead(zonas[i].pirPin); // Estado actual del sensor
 
     // Historial de actividad
     JsonArray actividad = zonaObj.createNestedArray("actividad");
@@ -412,7 +413,7 @@ bool enHorarioLaboral()
   return false;
 }
 
-// Handler para página principal
+// Handler para página principal - VERSIÓN OPTIMIZADA PARA MÓVILES
 void handleRoot()
 {
   char horaActual[9];
@@ -423,7 +424,7 @@ void handleRoot()
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Control de Luces Inteligente</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -442,60 +443,52 @@ void handleRoot()
       margin: 0;
       padding: 0;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      touch-action: manipulation;
     }
     
     body {
       background-color: #f5f7fa;
       color: #333;
       line-height: 1.6;
-      padding: 20px;
+      padding: 10px;
+      font-size: 14px;
     }
     
     .container {
-      max-width: 1200px;
+      max-width: 100%;
       margin: 0 auto;
       display: grid;
       grid-template-columns: 1fr;
-      gap: 20px;
-    }
-    
-    @media (min-width: 768px) {
-      .container {
-        grid-template-columns: repeat(2, 1fr);
-      }
+      gap: 15px;
     }
     
     .card {
       background: white;
       border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 15px;
       transition: transform 0.3s ease;
-    }
-    
-    .card:hover {
-      transform: translateY(-5px);
     }
     
     .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
       border-bottom: 1px solid #eee;
     }
     
     .card-title {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       font-weight: 600;
       color: var(--primary);
     }
     
     .status-badge {
-      padding: 5px 10px;
-      border-radius: 20px;
-      font-size: 0.85rem;
+      padding: 4px 8px;
+      border-radius: 15px;
+      font-size: 0.75rem;
       font-weight: 500;
     }
     
@@ -509,41 +502,36 @@ void handleRoot()
       color: #f72585;
     }
     
-    .status-warning {
-      background-color: rgba(248, 150, 30, 0.2);
-      color: #f8961e;
-    }
-    
     .clock-container {
       text-align: center;
-      padding: 15px;
+      padding: 12px;
       background: linear-gradient(135deg, #4361ee, #3a0ca3);
       color: white;
-      border-radius: 10px;
-      margin-bottom: 20px;
+      border-radius: 8px;
+      margin-bottom: 15px;
     }
     
     #real-time-clock {
-      font-size: 2.5rem;
+      font-size: 2.2rem;
       font-weight: 700;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
       font-family: 'Courier New', monospace;
     }
     
     .mode-indicator {
-      font-size: 1.2rem;
+      font-size: 1rem;
       margin-top: 5px;
     }
     
     .grid-2 {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 15px;
+      gap: 10px;
     }
     
     .zone-card {
       text-align: center;
-      padding: 15px;
+      padding: 12px;
       border-radius: 8px;
       background-color: #f8f9fa;
       position: relative;
@@ -569,26 +557,27 @@ void handleRoot()
     
     .zone-title {
       font-weight: 600;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+      font-size: 1rem;
     }
     
     .zone-status {
-      font-size: 1.1rem;
+      font-size: 1rem;
       font-weight: 700;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     
     .sensor-indicator {
       display: inline-block;
-      width: 15px;
-      height: 15px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      margin-right: 5px;
+      margin-right: 4px;
     }
     
     .sensor-active {
       background-color: #4cc9f0;
-      box-shadow: 0 0 8px #4cc9f0;
+      box-shadow: 0 0 6px #4cc9f0;
     }
     
     .sensor-inactive {
@@ -597,13 +586,14 @@ void handleRoot()
     
     .btn {
       display: inline-block;
-      padding: 8px 15px;
+      padding: 8px 12px;
       border: none;
       border-radius: 5px;
       cursor: pointer;
       font-weight: 500;
       transition: all 0.3s;
       text-decoration: none;
+      font-size: 0.9rem;
     }
     
     .btn-primary {
@@ -616,37 +606,33 @@ void handleRoot()
       color: white;
     }
     
-    .btn:hover {
-      opacity: 0.9;
-      transform: translateY(-2px);
-    }
-    
     .chart-container {
-      height: 250px;
+      height: 200px;
       position: relative;
     }
     
     .form-group {
-      margin-bottom: 15px;
+      margin-bottom: 12px;
     }
     
     label {
       display: block;
-      margin-bottom: 5px;
+      margin-bottom: 4px;
       font-weight: 500;
+      font-size: 0.9rem;
     }
     
     input[type='time'], input[type='text'] {
       width: 100%;
-      padding: 10px;
+      padding: 8px;
       border: 1px solid #ddd;
       border-radius: 5px;
-      font-size: 1rem;
+      font-size: 0.9rem;
     }
     
     .form-row {
       display: flex;
-      gap: 10px;
+      gap: 8px;
     }
     
     .form-row .form-group {
@@ -655,13 +641,48 @@ void handleRoot()
     
     .actions {
       display: flex;
-      gap: 10px;
-      margin-top: 10px;
+      gap: 8px;
+      margin-top: 8px;
     }
     
     .actions .btn {
       flex: 1;
       text-align: center;
+      padding: 8px;
+    }
+    
+    .connection-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 5px;
+      font-size: 0.8rem;
+    }
+    
+    .connection-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    
+    .connected {
+      background-color: #4cc9f0;
+    }
+    
+    .disconnected {
+      background-color: #f72585;
+    }
+    
+    .test-button {
+      background-color: #f8961e;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 8px 12px;
+      margin-top: 8px;
+      cursor: pointer;
+      width: 100%;
     }
   </style>
 </head>
@@ -671,6 +692,10 @@ void handleRoot()
       <div class="clock-container">
         <div id="real-time-clock">00:00:00</div>
         <div class="mode-indicator" id="mode-indicator">Modo: Cargando...</div>
+        <div class="connection-status">
+          <div class="connection-dot disconnected" id="connection-dot"></div>
+          <span id="connection-status">Desconectado</span>
+        </div>
       </div>
       
       <div class="grid-2">
@@ -685,6 +710,7 @@ void handleRoot()
             <a href="/on?zona=0" class="btn btn-primary">Encender</a>
             <a href="/off?zona=0" class="btn btn-danger">Apagar</a>
           </div>
+          <button class="test-button" onclick="testSensor(0)">Probar Sensor</button>
         </div>
         
         <div class="zone-card" id="zone-2-card">
@@ -698,13 +724,14 @@ void handleRoot()
             <a href="/on?zona=1" class="btn btn-primary">Encender</a>
             <a href="/off?zona=1" class="btn btn-danger">Apagar</a>
           </div>
+          <button class="test-button" onclick="testSensor(1)">Probar Sensor</button>
         </div>
       </div>
     </div>
     
     <div class="card">
       <div class="card-header">
-        <div class="card-title">Actividad de Sensores</div>
+        <div class="card-title">Actividad de Sensores (Últimos 60s)</div>
       </div>
       <div class="chart-container">
         <canvas id="activity-chart"></canvas>
@@ -713,50 +740,40 @@ void handleRoot()
     
     <div class="card">
       <div class="card-header">
-        <div class="card-title">Configuración de Horarios</div>
+        <div class="card-title">Configuración</div>
       </div>
       <form action="/update" method="post">
         <div class="form-row">
           <div class="form-group">
-            <label>Horario 1 Inicio:</label>
+            <label>Horario 1:</label>
             <input type="time" name="inicio0" value="08:00">
+            <input type="time" name="fin0" value="12:00" style="margin-top: 5px;">
           </div>
           <div class="form-group">
-            <label>Horario 1 Fin:</label>
-            <input type="time" name="fin0" value="12:00">
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label>Horario 2 Inicio:</label>
+            <label>Horario 2:</label>
             <input type="time" name="inicio1" value="14:00">
-          </div>
-          <div class="form-group">
-            <label>Horario 2 Fin:</label>
-            <input type="time" name="fin1" value="18:00">
+            <input type="time" name="fin1" value="18:00" style="margin-top: 5px;">
           </div>
         </div>
         
-        <button type="submit" class="btn btn-primary">Actualizar Horarios</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Actualizar Horarios</button>
       </form>
-    </div>
-    
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Configurar Hora Manual</div>
-      </div>
-      <form action="/settime" method="post">
+      
+      <form action="/settime" method="post" style="margin-top: 15px;">
         <div class="form-group">
           <label>Hora actual (HH:MM):</label>
           <input type="text" name="time" id="manual-time" placeholder="HH:MM">
         </div>
-        <button type="submit" class="btn btn-primary">Establecer Hora</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Establecer Hora</button>
       </form>
     </div>
   </div>
 
   <script>
+    // Elementos de estado de conexión
+    const connectionDot = document.getElementById('connection-dot');
+    const connectionStatus = document.getElementById('connection-status');
+    
     // Actualizar reloj en tiempo real
     function updateClock() {
       const now = new Date();
@@ -771,12 +788,80 @@ void handleRoot()
     setInterval(updateClock, 1000);
     
     // Configurar WebSocket
-    const socket = new WebSocket(`ws://${window.location.hostname}:81/`);
+    let socket;
+    let reconnectInterval;
+    const host = window.location.hostname;
+    
+    function initWebSocket() {
+      socket = new WebSocket(`ws://${host}:81/`);
+      
+      socket.addEventListener('open', (event) => {
+        console.log('WebSocket conectado');
+        connectionDot.classList.remove('disconnected');
+        connectionDot.classList.add('connected');
+        connectionStatus.textContent = 'Conectado';
+      });
+      
+      socket.addEventListener('message', (event) => {
+        const data = JSON.parse(event.data);
+        
+        // Actualizar hora
+        document.getElementById('real-time-clock').textContent = 
+          `${String(data.hora).padStart(2, '0')}:${String(data.minuto).padStart(2, '0')}:${String(data.segundo).padStart(2, '0')}`;
+        
+        // Actualizar modo
+        document.getElementById('mode-indicator').textContent = `Modo: ${data.modo}`;
+        
+        // Actualizar zonas
+        data.zonas.forEach((zona, index) => {
+          const zoneCard = document.getElementById(`zone-${index+1}-card`);
+          const zoneStatus = document.getElementById(`zone-${index+1}-status`);
+          const zoneSensor = document.getElementById(`zone-${index+1}-sensor`);
+          
+          // Actualizar estado
+          zoneStatus.textContent = zona.activo ? 'ENCENDIDO' : 'APAGADO';
+          zoneStatus.style.color = zona.activo ? '#4cc9f0' : '#f72585';
+          
+          // Actualizar tarjeta
+          zoneCard.classList.toggle('active', zona.activo);
+          zoneCard.classList.toggle('inactive', !zona.activo);
+          
+          // Actualizar sensor
+          const sensorActive = zona.movimiento === 1;
+          zoneSensor.classList.toggle('sensor-active', sensorActive);
+          zoneSensor.classList.toggle('sensor-inactive', !sensorActive);
+          
+          // Actualizar gráfico
+          if (activityChart) {
+            chartData.datasets[index].data = zona.actividad;
+            activityChart.update();
+          }
+        });
+      });
+      
+      socket.addEventListener('close', (event) => {
+        console.log('WebSocket desconectado');
+        connectionDot.classList.remove('connected');
+        connectionDot.classList.add('disconnected');
+        connectionStatus.textContent = 'Desconectado, reconectando...';
+        
+        // Intentar reconectar cada 3 segundos
+        clearInterval(reconnectInterval);
+        reconnectInterval = setTimeout(() => {
+          initWebSocket();
+        }, 3000);
+      });
+      
+      socket.addEventListener('error', (error) => {
+        console.error('WebSocket error:', error);
+        socket.close();
+      });
+    }
     
     // Variables para gráficos
     let activityChart;
     let chartData = {
-      labels: Array.from({length: 60}, (_, i) => i),
+      labels: Array.from({length: 60}, (_, i) => 59 - i), // De 59 a 0 (ahora)
       datasets: [
         {
           label: 'Zona 1',
@@ -784,7 +869,8 @@ void handleRoot()
           borderColor: '#4361ee',
           backgroundColor: 'rgba(67, 97, 238, 0.1)',
           tension: 0.4,
-          fill: true
+          fill: true,
+          pointRadius: 0 // Sin puntos para mejorar rendimiento
         },
         {
           label: 'Zona 2',
@@ -792,7 +878,8 @@ void handleRoot()
           borderColor: '#f72585',
           backgroundColor: 'rgba(247, 37, 133, 0.1)',
           tension: 0.4,
-          fill: true
+          fill: true,
+          pointRadius: 0
         }
       ]
     };
@@ -818,7 +905,12 @@ void handleRoot()
             x: {
               reverse: true,
               ticks: {
-                callback: (value, index) => index === 0 ? 'Ahora' : `${index}s`
+                maxTicksLimit: 10,
+                callback: (value, index) => {
+                  if (index === 0) return 'Ahora';
+                  if (index === 59) return '60s';
+                  return (59 - index) % 10 === 0 ? `${59 - index}s` : '';
+                }
               }
             }
           },
@@ -839,43 +931,25 @@ void handleRoot()
       });
     }
     
-    // Manejar mensajes WebSocket
-    socket.addEventListener('message', event => {
-      const data = JSON.parse(event.data);
+    // Función para probar sensores
+    function testSensor(zonaIndex) {
+      const sensorElement = document.getElementById(`zone-${zonaIndex+1}-sensor`);
       
-      // Actualizar hora
-      document.getElementById('real-time-clock').textContent = 
-        `${String(data.hora).padStart(2, '0')}:${String(data.minuto).padStart(2, '0')}:${String(data.segundo).padStart(2, '0')}`;
+      // Simular detección de movimiento
+      sensorElement.classList.add('sensor-active');
       
-      // Actualizar modo
-      document.getElementById('mode-indicator').textContent = `Modo: ${data.modo}`;
+      setTimeout(() => {
+        sensorElement.classList.remove('sensor-active');
+      }, 2000);
       
-      // Actualizar zonas
-      data.zonas.forEach((zona, index) => {
-        const zoneCard = document.getElementById(`zone-${index+1}-card`);
-        const zoneStatus = document.getElementById(`zone-${index+1}-status`);
-        const zoneSensor = document.getElementById(`zone-${index+1}-sensor`);
-        
-        // Actualizar estado
-        zoneStatus.textContent = zona.activo ? 'ENCENDIDO' : 'APAGADO';
-        zoneStatus.style.color = zona.activo ? '#4cc9f0' : '#f72585';
-        
-        // Actualizar tarjeta
-        zoneCard.classList.toggle('active', zona.activo);
-        zoneCard.classList.toggle('inactive', !zona.activo);
-        
-        // Actualizar sensor
-        const sensorActive = zona.actividad[zona.actividad.length - 1] === 1;
-        zoneSensor.classList.toggle('sensor-active', sensorActive);
-        zoneSensor.classList.toggle('sensor-inactive', !sensorActive);
-        
-        // Actualizar gráfico
-        if (activityChart) {
-          chartData.datasets[index].data = zona.actividad;
-          activityChart.update();
-        }
-      });
-    });
+      // Enviar comando al ESP32 para activar manualmente
+      fetch(`/on?zona=${zonaIndex}`)
+        .then(() => {
+          setTimeout(() => {
+            fetch(`/off?zona=${zonaIndex}`);
+          }, 5000);
+        });
+    }
     
     // Actualizar hora manual con hora actual del sistema
     document.addEventListener('DOMContentLoaded', () => {
@@ -885,14 +959,7 @@ void handleRoot()
       document.getElementById('manual-time').value = `${hours}:${minutes}`;
       
       initChart();
-    });
-    
-    // Reconectar si se pierde conexión
-    socket.addEventListener('close', () => {
-      console.log('WebSocket desconectado, reconectando...');
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      initWebSocket();
     });
   </script>
 </body>
