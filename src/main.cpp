@@ -2,8 +2,8 @@
 #include <WebServer.h>
 
 // Configuración WiFi
-const char *ssid = "HomeLess";
-const char *password = "Homeless2022";
+const char *ssid = "SistemaDigitales";
+const char *password = "12345678";
 
 // Configuración de pines
 #define PIR1_PIN 13
