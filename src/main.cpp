@@ -9,96 +9,96 @@ const char *ssid = "SistemaDigitales";
 const char *password = "12345678";
 
 // Configuración de pines
-#define PIR1_PIN 13
-#define PIR2_PIN 15
+#define PIN_PIR1 13
+#define PIN_PIR2 15
 
-#define RELAY1_PIN 32
-#define RELAY2_PIN 25
-#define RELAY3_PIN 26
-#define RELAY4_PIN 21
+#define PIN_RELAY1 32
+#define PIN_RELAY2 25
+#define PIN_RELAY3 26
+#define PIN_RELAY4 21
 
 // Variables para manejo de interrupciones
-volatile bool pir1Triggered = false;
-volatile bool pir2Triggered = false;
-volatile unsigned long pir1Time = 0;
-volatile unsigned long pir2Time = 0;
+volatile bool pir1Disparado = false;
+volatile bool pir2Disparado = false;
+volatile unsigned long tiempoPir1 = 0;
+volatile unsigned long tiempoPir2 = 0;
 
 // Estructura de zonas
 struct Zona
 {
-  int pirPin;
-  int relayPines[2];
-  unsigned long lastMotion;
-  unsigned long encendidoTime; // Tiempo cuando se encendió
-  bool activo;
-  bool manual;
+  int pinPir;
+  int pinesRelay[2];
+  unsigned long ultimoMovimiento;
+  unsigned long tiempoEncendido; // Tiempo cuando se encendió
+  bool estaActivo;
+  bool controlManual;
   String nombre;
-  int actividad[60]; // Historial de últimos 60 segundos
-  int actividadPtr;
+  int historialActividad[60]; // Historial de últimos 60 segundos
+  int punteroActividad;
   // constructor para inicializar la zona
-  Zona(int pir, int relay1, int relay2, String name)
+  Zona(int pir, int relay1, int relay2, String nombre)
   {
-    pirPin = pir;
-    relayPines[0] = relay1;
-    relayPines[1] = relay2;
-    lastMotion = 0;
-    encendidoTime = 0;
-    activo = false;
-    manual = false;
-    nombre = name;
-    actividadPtr = 0;
+    pinPir = pir;
+    pinesRelay[0] = relay1;
+    pinesRelay[1] = relay2;
+    ultimoMovimiento = 0;
+    tiempoEncendido = 0;
+    estaActivo = false;
+    controlManual = false;
+    this->nombre = nombre;
+    punteroActividad = 0;
     for (int i = 0; i < 60; i++)
     {
-      actividad[i] = 0;
+      historialActividad[i] = 0;
     }
   }
 };
 
 Zona zonas[] = {
-    Zona(PIR1_PIN, RELAY1_PIN, RELAY2_PIN, String("Zona 1")),
-    Zona(PIR2_PIN, RELAY3_PIN, RELAY4_PIN, String("Zona 2"))};
+    Zona(PIN_PIR1, PIN_RELAY1, PIN_RELAY2, String("Zona 1")),
+    Zona(PIN_PIR2, PIN_RELAY3, PIN_RELAY4, String("Zona 2"))};
 
 // Horarios laborales
-String horarios[][2] = {
+String horariosLaborales[][2] = {
     {"08:00", "12:00"},
     {"14:00", "18:10"}};
-const int horarioCount = 2;
+const int cantidadHorarios = 2;
 
 // Constantes
-const unsigned long TIEMPO_APAGADO = 300000; // 5 minutos (300 segundos)
-const int VALOR_ENCENDIDO_RELAY = LOW;
-const int VALOR_APAGADO_RELAY = HIGH;
+const unsigned long TIEMPO_MAXIMO_ENCENDIDO = 300000; // 5 minutos (300 segundos)
+const int VALOR_RELAY_ENCENDIDO = LOW;
+const int VALOR_RELAY_APAGADO = HIGH;
 
 // Variables globales
-bool modoHorario = true;
-WebServer server(80);
-WebSocketsServer webSocket = WebSocketsServer(81);
+bool estaEnHorarioLaboral = true;
+WebServer servidor(80);
+WebSocketsServer socketWeb = WebSocketsServer(81);
 
 // Variables para mejorar sincronización WebSocket
-unsigned long lastSensorUpdate = 0;
+unsigned long ultimaActualizacionSensor = 0;
 bool estadoSensoresAnterior[2] = {false, false};
 
 // Variables para el reloj manual
-int horaManual = 8;                        // Hora inicial: 8 AM
-int minutoManual = 0;                      // Minutos iniciales
-int segundoManual = 0;                     // Segundos iniciales
-unsigned long ultimoTiempoActualizado = 0; // Para llevar el tiempo transcurrido
+int horaActual = 8;                        // Hora inicial: 8 AM
+int minutoActual = 0;                      // Minutos iniciales
+int segundoActual = 0;                     // Segundos iniciales
+unsigned long ultimaActualizacionTiempo = 0; // Para llevar el tiempo transcurrido
 
 // Prototipos de funciones
-void IRAM_ATTR handlePIR1();
-void IRAM_ATTR handlePIR2();
-void procesarInterrupciones();
-void setZonaActiva(int zonaIndex, bool activa);
-void manejarApagadoAutomatico();
-bool enHorarioLaboral();
+void IRAM_ATTR manejarPIR1();
+void IRAM_ATTR manejarPIR2();
+void procesarInterrupcionesPIR();
+void configurarEstadoZona(int indiceZona, bool activar);
+void controlarApagadoAutomatico();
+bool verificarSiEsHorarioLaboral();
 void actualizarRelojInterno();
-void handleRoot();
-void handleManualControl();
-void handleUpdateHorarios();
-void handleSetTime();
-void handleNotFound();
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length);
-void enviarEstadoWebSocket();
+void manejarPaginaPrincipal();
+void manejarControlManual();
+void manejarActualizacionHorarios();
+void manejarConfiguracionHora();
+void manejarPaginaNoEncontrada();
+void eventoSocketWeb(uint8_t num, WStype_t type, uint8_t *payload, size_t length);
+void enviarEstadoPorSocketWeb();
 void actualizarHistorialActividad();
 
 void setup()
@@ -110,16 +110,16 @@ void setup()
   // Inicializar pines
   for (int i = 0; i < 2; i++)
   {
-    pinMode(zonas[i].pirPin, INPUT);
+    pinMode(zonas[i].pinPir, INPUT);
     for (int j = 0; j < 2; j++)
     {
-      pinMode(zonas[i].relayPines[j], OUTPUT);
-      digitalWrite(zonas[i].relayPines[j], VALOR_APAGADO_RELAY);
+      pinMode(zonas[i].pinesRelay[j], OUTPUT);
+      digitalWrite(zonas[i].pinesRelay[j], VALOR_RELAY_APAGADO);
     }
     // Inicializar historial de actividad
     for (int k = 0; k < 60; k++)
     {
-      zonas[i].actividad[k] = 0;
+      zonas[i].historialActividad[k] = 0;
     }
   }
 
@@ -132,81 +132,81 @@ void setup()
   Serial.println(WiFi.softAPIP());
 
   // Iniciar el reloj interno
-  ultimoTiempoActualizado = millis();
+  ultimaActualizacionTiempo = millis();
 
   // Configurar interrupciones PIR seguras
-  attachInterrupt(digitalPinToInterrupt(PIR1_PIN), handlePIR1, RISING);
-  attachInterrupt(digitalPinToInterrupt(PIR2_PIN), handlePIR2, RISING);
+  attachInterrupt(digitalPinToInterrupt(PIN_PIR1), manejarPIR1, RISING);
+  attachInterrupt(digitalPinToInterrupt(PIN_PIR2), manejarPIR2, RISING);
 
   // Configurar rutas del servidor web
-  server.on("/", handleRoot);
-  server.on("/on", handleManualControl);
-  server.on("/off", handleManualControl);
-  server.on("/update", HTTP_POST, handleUpdateHorarios);
-  server.on("/settime", HTTP_POST, handleSetTime);
-  server.onNotFound(handleNotFound);
+  servidor.on("/", manejarPaginaPrincipal);
+  servidor.on("/on", manejarControlManual);
+  servidor.on("/off", manejarControlManual);
+  servidor.on("/update", HTTP_POST, manejarActualizacionHorarios);
+  servidor.on("/settime", HTTP_POST, manejarConfiguracionHora);
+  servidor.onNotFound(manejarPaginaNoEncontrada);
 
   // Iniciar servidor WebSocket
-  webSocket.begin();
-  webSocket.onEvent(webSocketEvent);
+  socketWeb.begin();
+  socketWeb.onEvent(eventoSocketWeb);
 
-  server.begin();
+  servidor.begin();
   Serial.println("Servidor HTTP iniciado");
   Serial.println("Servidor WebSocket iniciado en puerto 81");
 }
 
 void loop()
 {
-  server.handleClient();
-  webSocket.loop();
+  servidor.handleClient();
+  socketWeb.loop();
   actualizarRelojInterno();
   
   // Actualizar modo horario SIN resetear estados
-  bool nuevoModoHorario = enHorarioLaboral();
-  if (modoHorario != nuevoModoHorario) {
-    modoHorario = nuevoModoHorario;
-    Serial.printf("Modo cambiado a: %s\n", modoHorario ? "Horario Laboral" : "Fuera de Horario");
+  bool nuevoModoHorario = verificarSiEsHorarioLaboral();
+  if (estaEnHorarioLaboral != nuevoModoHorario) {
+    estaEnHorarioLaboral = nuevoModoHorario;
+    Serial.printf("Modo cambiado a: %s\n", estaEnHorarioLaboral ? "Horario Laboral" : "Fuera de Horario");
     
-    // Al cambiar a fuera de horario, actualizar lastMotion para todas las zonas activas
-    if (!modoHorario) {
+    // Al cambiar a fuera de horario, actualizar ultimoMovimiento para todas las zonas activas
+    if (!estaEnHorarioLaboral) {
       for (int i = 0; i < 2; i++) {
-        if (zonas[i].activo) {
-          zonas[i].lastMotion = millis(); // Dar tiempo de gracia
+        if (zonas[i].estaActivo) {
+          zonas[i].ultimoMovimiento = millis(); // Dar tiempo de gracia
           Serial.printf("Zona %d: Tiempo de movimiento actualizado por cambio de modo\n", i + 1);
         }
       }
     }
     
-    enviarEstadoWebSocket(); // Enviar inmediatamente cuando cambie el modo
+    enviarEstadoPorSocketWeb(); // Enviar inmediatamente cuando cambie el modo
   }
   
-  procesarInterrupciones();
-  manejarApagadoAutomatico();
+  procesarInterrupcionesPIR();
+  controlarApagadoAutomatico();
   actualizarHistorialActividad();
 
   // Verificar cambios en sensores para envío inmediato
-  bool sensoresChanged = false;
+  bool sensoresCambiaron = false;
   for (int i = 0; i < 2; i++) {
-    bool estadoActual = digitalRead(zonas[i].pirPin);
-    if (estadoActual != estadoSensoresAnterior[i]) {
-      estadoSensoresAnterior[i] = estadoActual;
-      sensoresChanged = true;
+    bool estadoActualSensor = digitalRead(zonas[i].pinPir);
+    if (estadoActualSensor != estadoSensoresAnterior[i]) {
+      estadoSensoresAnterior[i] = estadoActualSensor;
+      sensoresCambiaron = true;
     }
   }
   
   // Enviar estado cada segundo o cuando cambien los sensores
-  static unsigned long lastUpdate = 0;
-  if (millis() - lastUpdate > 1000 || sensoresChanged)
+  static unsigned long ultimaActualizacion = 0;
+  if (millis() - ultimaActualizacion > 1000 || sensoresCambiaron)
   {
-    enviarEstadoWebSocket();
-    lastUpdate = millis();
+    enviarEstadoPorSocketWeb();
+    ultimaActualizacion = millis();
   }
 
   delay(10);
 }
 
 // WebSocket Event Handler
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
+void eventoSocketWeb(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 {
   switch (type)
   {
@@ -215,9 +215,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
     break;
   case WStype_CONNECTED:
   {
-    IPAddress ip = webSocket.remoteIP(num);
+    IPAddress ip = socketWeb.remoteIP(num);
     Serial.printf("[%u] Conectado desde %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
-    enviarEstadoWebSocket();
+    enviarEstadoPorSocketWeb();
     break;
   }
   case WStype_TEXT:
@@ -227,41 +227,41 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 }
 
 // Enviar estado actual a todos los clientes WebSocket
-void enviarEstadoWebSocket()
+void enviarEstadoPorSocketWeb()
 {
-  DynamicJsonDocument doc(1024);
+  DynamicJsonDocument documento(1024);
 
   // Hora actual
-  doc["hora"] = horaManual;
-  doc["minuto"] = minutoManual;
-  doc["segundo"] = segundoManual;
+  documento["hora"] = horaActual;
+  documento["minuto"] = minutoActual;
+  documento["segundo"] = segundoActual;
 
   // Modo de operación
-  doc["modo"] = modoHorario ? "Horario Laboral" : "Fuera de Horario";
+  documento["modo"] = estaEnHorarioLaboral ? "Horario Laboral" : "Fuera de Horario";
 
   // Estado de zonas
-  JsonArray zonasArray = doc.createNestedArray("zonas");
+  JsonArray arregloZonas = documento.createNestedArray("zonas");
   for (int i = 0; i < 2; i++)
   {
-    JsonObject zonaObj = zonasArray.createNestedObject();
-    zonaObj["nombre"] = zonas[i].nombre;
-    zonaObj["activo"] = zonas[i].activo;
-    zonaObj["manual"] = zonas[i].manual;
-    zonaObj["movimiento"] = digitalRead(zonas[i].pirPin); // Estado actual del sensor
+    JsonObject objetoZona = arregloZonas.createNestedObject();
+    objetoZona["nombre"] = zonas[i].nombre;
+    objetoZona["activo"] = zonas[i].estaActivo;
+    objetoZona["manual"] = zonas[i].controlManual;
+    objetoZona["movimiento"] = digitalRead(zonas[i].pinPir); // Estado actual del sensor
 
     // Calcular countdown si está activo
-    if (zonas[i].activo && zonas[i].encendidoTime > 0) {
+    if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0) {
       unsigned long tiempoRestante = 0;
       
-      if (modoHorario) {
+      if (estaEnHorarioLaboral) {
         // En horario laboral: countdown desde activación
-        unsigned long tiempoTranscurrido = millis() - zonas[i].encendidoTime;
-        tiempoRestante = (TIEMPO_APAGADO > tiempoTranscurrido) ? (TIEMPO_APAGADO - tiempoTranscurrido) / 1000 : 0;
+        unsigned long tiempoTranscurrido = millis() - zonas[i].tiempoEncendido;
+        tiempoRestante = (TIEMPO_MAXIMO_ENCENDIDO > tiempoTranscurrido) ? (TIEMPO_MAXIMO_ENCENDIDO - tiempoTranscurrido) / 1000 : 0;
       } else {
         // Fuera de horario: verificar movimiento global
         bool hayMovimientoGlobal = false;
         for (int j = 0; j < 2; j++) {
-          if ((millis() - zonas[j].lastMotion) <= 30000) {
+          if ((millis() - zonas[j].ultimoMovimiento) <= 30000) {
             hayMovimientoGlobal = true;
             break;
           }
@@ -271,82 +271,82 @@ void enviarEstadoWebSocket()
           tiempoRestante = 0; // Se apagará inmediatamente
         } else {
           // Hay movimiento: countdown desde activación
-          unsigned long tiempoTranscurrido = millis() - zonas[i].encendidoTime;
-          tiempoRestante = (TIEMPO_APAGADO > tiempoTranscurrido) ? (TIEMPO_APAGADO - tiempoTranscurrido) / 1000 : 0;
+          unsigned long tiempoTranscurrido = millis() - zonas[i].tiempoEncendido;
+          tiempoRestante = (TIEMPO_MAXIMO_ENCENDIDO > tiempoTranscurrido) ? (TIEMPO_MAXIMO_ENCENDIDO - tiempoTranscurrido) / 1000 : 0;
         }
       }
       
-      zonaObj["countdown"] = tiempoRestante;
+      objetoZona["countdown"] = tiempoRestante;
     } else {
-      zonaObj["countdown"] = 0;
+      objetoZona["countdown"] = 0;
     }
 
     // Historial de actividad
-    JsonArray actividad = zonaObj.createNestedArray("actividad");
+    JsonArray actividadArray = objetoZona.createNestedArray("actividad");
     for (int j = 0; j < 60; j++)
     {
-      actividad.add(zonas[i].actividad[j]);
+      actividadArray.add(zonas[i].historialActividad[j]);
     }
   }
 
-  String jsonString;
-  serializeJson(doc, jsonString);
-  webSocket.broadcastTXT(jsonString);
+  String cadenaJson;
+  serializeJson(documento, cadenaJson);
+  socketWeb.broadcastTXT(cadenaJson);
 }
 
 // Actualizar historial de actividad
 void actualizarHistorialActividad()
 {
-  static unsigned long lastUpdate = 0;
-  if (millis() - lastUpdate > 1000)
+  static unsigned long ultimaActualizacion = 0;
+  if (millis() - ultimaActualizacion > 1000)
   {
     for (int i = 0; i < 2; i++)
     {
-      zonas[i].actividadPtr = (zonas[i].actividadPtr + 1) % 60;
-      zonas[i].actividad[zonas[i].actividadPtr] = digitalRead(zonas[i].pirPin);
+      zonas[i].punteroActividad = (zonas[i].punteroActividad + 1) % 60;
+      zonas[i].historialActividad[zonas[i].punteroActividad] = digitalRead(zonas[i].pinPir);
     }
-    lastUpdate = millis();
+    ultimaActualizacion = millis();
   }
 }
 
 // Interrupciones seguras
-void IRAM_ATTR handlePIR1()
+void IRAM_ATTR manejarPIR1()
 {
-  if (modoHorario) return; // Solo procesar fuera de horario laboral
+  if (estaEnHorarioLaboral) return; // Solo procesar fuera de horario laboral
   
-  pir1Triggered = true;
-  pir1Time = millis();
+  pir1Disparado = true;
+  tiempoPir1 = millis();
   Serial.println("PIR1 detectado (fuera de horario)");
 }
 
-void IRAM_ATTR handlePIR2()
+void IRAM_ATTR manejarPIR2()
 {
-  if (modoHorario) return; // Solo procesar fuera de horario laboral
+  if (estaEnHorarioLaboral) return; // Solo procesar fuera de horario laboral
   
-  pir2Triggered = true;
-  pir2Time = millis();
+  pir2Disparado = true;
+  tiempoPir2 = millis();
   Serial.println("PIR2 detectado (fuera de horario)");
 }
 
 // Procesar interrupciones en el loop principal
-void procesarInterrupciones()
+void procesarInterrupcionesPIR()
 {
-  if (pir1Triggered)
+  if (pir1Disparado)
   {
-    pir1Triggered = false;
-    if (!modoHorario) // Solo procesar fuera de horario
+    pir1Disparado = false;
+    if (!estaEnHorarioLaboral) // Solo procesar fuera de horario
     {
-      zonas[0].lastMotion = pir1Time;
+      zonas[0].ultimoMovimiento = tiempoPir1;
       Serial.println("Zona 1: Movimiento detectado - actualizando temporizador");
     }
   }
 
-  if (pir2Triggered)
+  if (pir2Disparado)
   {
-    pir2Triggered = false;
-    if (!modoHorario) // Solo procesar fuera de horario
+    pir2Disparado = false;
+    if (!estaEnHorarioLaboral) // Solo procesar fuera de horario
     {
-      zonas[1].lastMotion = pir2Time;
+      zonas[1].ultimoMovimiento = tiempoPir2;
       Serial.println("Zona 2: Movimiento detectado - actualizando temporizador");
     }
   }
@@ -356,65 +356,65 @@ void procesarInterrupciones()
 void actualizarRelojInterno()
 {
   unsigned long tiempoActual = millis();
-  unsigned long segundosTranscurridos = (tiempoActual - ultimoTiempoActualizado) / 1000;
+  unsigned long segundosTranscurridos = (tiempoActual - ultimaActualizacionTiempo) / 1000;
 
   if (segundosTranscurridos > 0)
   {
-    segundoManual += segundosTranscurridos;
+    segundoActual += segundosTranscurridos;
 
-    if (segundoManual >= 60)
+    if (segundoActual >= 60)
     {
-      minutoManual += segundoManual / 60;
-      segundoManual %= 60;
+      minutoActual += segundoActual / 60;
+      segundoActual %= 60;
 
-      if (minutoManual >= 60)
+      if (minutoActual >= 60)
       {
-        horaManual += minutoManual / 60;
-        minutoManual %= 60;
+        horaActual += minutoActual / 60;
+        minutoActual %= 60;
 
-        if (horaManual >= 24)
+        if (horaActual >= 24)
         {
-          horaManual %= 24;
+          horaActual %= 24;
         }
       }
     }
-    ultimoTiempoActualizado = tiempoActual;
+    ultimaActualizacionTiempo = tiempoActual;
   }
 }
 
 // Establecer estado de una zona
-void setZonaActiva(int zonaIndex, bool activa)
+void configurarEstadoZona(int indiceZona, bool activar)
 {
-  zonas[zonaIndex].activo = activa;
-  if (activa) {
-    zonas[zonaIndex].encendidoTime = millis();
+  zonas[indiceZona].estaActivo = activar;
+  if (activar) {
+    zonas[indiceZona].tiempoEncendido = millis();
   } else {
-    zonas[zonaIndex].encendidoTime = 0;
+    zonas[indiceZona].tiempoEncendido = 0;
   }
   
   for (int i = 0; i < 2; i++)
   {
-    digitalWrite(zonas[zonaIndex].relayPines[i], activa ? VALOR_ENCENDIDO_RELAY : VALOR_APAGADO_RELAY);
+    digitalWrite(zonas[indiceZona].pinesRelay[i], activar ? VALOR_RELAY_ENCENDIDO : VALOR_RELAY_APAGADO);
   }
 }
 
 // Manejar apagado automático
-void manejarApagadoAutomatico()
+void controlarApagadoAutomatico()
 {
   unsigned long tiempoActual = millis();
 
-  if (modoHorario)
+  if (estaEnHorarioLaboral)
   {
     // En horario laboral: control manual normal con temporizador
     for (int i = 0; i < 2; i++)
     {
-      if (zonas[i].activo && zonas[i].encendidoTime > 0)
+      if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0)
       {
-        unsigned long tiempoEncendido = tiempoActual - zonas[i].encendidoTime;
-        if (tiempoEncendido > TIEMPO_APAGADO)
+        unsigned long tiempoEncendido = tiempoActual - zonas[i].tiempoEncendido;
+        if (tiempoEncendido > TIEMPO_MAXIMO_ENCENDIDO)
         {
-          setZonaActiva(i, false);
-          zonas[i].manual = false;
+          configurarEstadoZona(i, false);
+          zonas[i].controlManual = false;
           Serial.printf("Zona %d apagada por timeout (horario laboral)\n", i + 1);
         }
       }
@@ -427,7 +427,7 @@ void manejarApagadoAutomatico()
     
     // Verificar si hay movimiento reciente en cualquier zona
     for (int i = 0; i < 2; i++) {
-      if ((tiempoActual - zonas[i].lastMotion) <= 30000) { // 30 segundos de gracia
+      if ((tiempoActual - zonas[i].ultimoMovimiento) <= 30000) { // 30 segundos de gracia
         hayMovimientoGlobal = true;
         break;
       }
@@ -435,28 +435,28 @@ void manejarApagadoAutomatico()
     
     // Si NO hay movimiento global, apagar TODAS las zonas
     if (!hayMovimientoGlobal) {
-      bool algunaApagada = false;
+      bool algunaZonaApagada = false;
       for (int i = 0; i < 2; i++) {
-        if (zonas[i].activo) {
-          setZonaActiva(i, false);
-          zonas[i].manual = false;
-          algunaApagada = true;
+        if (zonas[i].estaActivo) {
+          configurarEstadoZona(i, false);
+          zonas[i].controlManual = false;
+          algunaZonaApagada = true;
         }
       }
-      if (algunaApagada) {
+      if (algunaZonaApagada) {
         Serial.println("TODAS las zonas apagadas - Sin movimiento fuera de horario");
       }
     }
     else {
       // HAY movimiento: mantener countdown individual
       for (int i = 0; i < 2; i++) {
-        if (zonas[i].activo && zonas[i].encendidoTime > 0) {
-          unsigned long tiempoEncendido = tiempoActual - zonas[i].encendidoTime;
+        if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0) {
+          unsigned long tiempoEncendido = tiempoActual - zonas[i].tiempoEncendido;
           
           // Apagar si excede el tiempo máximo (5 minutos)
-          if (tiempoEncendido > TIEMPO_APAGADO) {
-            setZonaActiva(i, false);
-            zonas[i].manual = false;
+          if (tiempoEncendido > TIEMPO_MAXIMO_ENCENDIDO) {
+            configurarEstadoZona(i, false);
+            zonas[i].controlManual = false;
             Serial.printf("Zona %d apagada por timeout máximo (5 min)\n", i + 1);
           }
         }
@@ -466,14 +466,14 @@ void manejarApagadoAutomatico()
 }
 
 // Verificar si estamos en horario laboral
-bool enHorarioLaboral()
+bool verificarSiEsHorarioLaboral()
 {
-  char horaActual[6];
-  sprintf(horaActual, "%02d:%02d", horaManual, minutoManual);
+  char cadenaHoraActual[6];
+  sprintf(cadenaHoraActual, "%02d:%02d", horaActual, minutoActual);
 
-  for (int i = 0; i < horarioCount; i++)
+  for (int i = 0; i < cantidadHorarios; i++)
   {
-    if (String(horaActual) >= horarios[i][0] && String(horaActual) <= horarios[i][1])
+    if (String(cadenaHoraActual) >= horariosLaborales[i][0] && String(cadenaHoraActual) <= horariosLaborales[i][1])
     {
       return true;
     }
@@ -482,10 +482,10 @@ bool enHorarioLaboral()
 }
 
 // Handler para página principal - VERSIÓN OPTIMIZADA PARA MÓVILES
-void handleRoot()
+void manejarPaginaPrincipal()
 {
-  char horaActual[9];
-  sprintf(horaActual, "%02d:%02d:%02d", horaManual, minutoManual, segundoManual);
+  char cadenaHoraActual[9];
+  sprintf(cadenaHoraActual, "%02d:%02d:%02d", horaActual, minutoActual, segundoActual);
 
   String html = R"=====(<!DOCTYPE html>
 <html lang="es">
@@ -980,83 +980,83 @@ void handleRoot()
 </html>
 )=====";
 
-  server.send(200, "text/html", html);
+  servidor.send(200, "text/html", html);
 }
 
 // Configurar hora manual
-void handleSetTime()
+void manejarConfiguracionHora()
 {
-  if (server.hasArg("time"))
+  if (servidor.hasArg("time"))
   {
-    String timeStr = server.arg("time");
+    String cadenaHora = servidor.arg("time");
     int hora, minuto;
-    if (sscanf(timeStr.c_str(), "%d:%d", &hora, &minuto) == 2)
+    if (sscanf(cadenaHora.c_str(), "%d:%d", &hora, &minuto) == 2)
     {
-      horaManual = hora;
-      minutoManual = minuto;
-      segundoManual = 0;
-      ultimoTiempoActualizado = millis();
+      horaActual = hora;
+      minutoActual = minuto;
+      segundoActual = 0;
+      ultimaActualizacionTiempo = millis();
       Serial.printf("Hora actualizada: %02d:%02d\n", hora, minuto);
     }
   }
-  server.sendHeader("Location", "/");
-  server.send(303);
+  servidor.sendHeader("Location", "/");
+  servidor.send(303);
 }
 
 // Control manual de zonas
-void handleManualControl()
+void manejarControlManual()
 {
-  if (server.hasArg("zona"))
+  if (servidor.hasArg("zona"))
   {
-    int zonaIndex = server.arg("zona").toInt();
-    if (zonaIndex >= 0 && zonaIndex < 2)
+    int indiceZona = servidor.arg("zona").toInt();
+    if (indiceZona >= 0 && indiceZona < 2)
     {
-      bool encender = (server.uri() == "/on");
+      bool encender = (servidor.uri() == "/on");
       
       if (encender) {
-        zonas[zonaIndex].manual = true;
-        setZonaActiva(zonaIndex, true);
+        zonas[indiceZona].controlManual = true;
+        configurarEstadoZona(indiceZona, true);
         
         // Establecer tiempo de movimiento para mantener la luz
-        zonas[zonaIndex].lastMotion = millis();
+        zonas[indiceZona].ultimoMovimiento = millis();
         
-        if (!modoHorario) {
-          Serial.printf("Zona %d encendida manualmente (fuera de horario)\n", zonaIndex + 1);
+        if (!estaEnHorarioLaboral) {
+          Serial.printf("Zona %d encendida manualmente (fuera de horario)\n", indiceZona + 1);
         } else {
-          Serial.printf("Zona %d encendida manualmente (horario laboral)\n", zonaIndex + 1);
+          Serial.printf("Zona %d encendida manualmente (horario laboral)\n", indiceZona + 1);
         }
       } else {
-        zonas[zonaIndex].manual = false;
-        setZonaActiva(zonaIndex, false);
-        Serial.printf("Zona %d apagada manualmente\n", zonaIndex + 1);
+        zonas[indiceZona].controlManual = false;
+        configurarEstadoZona(indiceZona, false);
+        Serial.printf("Zona %d apagada manualmente\n", indiceZona + 1);
       }
     }
   }
-  server.sendHeader("Location", "/");
-  server.send(303);
+  servidor.sendHeader("Location", "/");
+  servidor.send(303);
 }
 
 // Actualizar horarios
-void handleUpdateHorarios()
+void manejarActualizacionHorarios()
 {
-  for (int i = 0; i < horarioCount; i++)
+  for (int i = 0; i < cantidadHorarios; i++)
   {
-    String inicioKey = "inicio" + String(i);
-    String finKey = "fin" + String(i);
-    if (server.hasArg(inicioKey) && server.hasArg(finKey))
+    String claveInicio = "inicio" + String(i);
+    String claveFin = "fin" + String(i);
+    if (servidor.hasArg(claveInicio) && servidor.hasArg(claveFin))
     {
-      horarios[i][0] = server.arg(inicioKey);
-      horarios[i][1] = server.arg(finKey);
+      horariosLaborales[i][0] = servidor.arg(claveInicio);
+      horariosLaborales[i][1] = servidor.arg(claveFin);
       Serial.printf("Horario actualizado: %s - %s\n",
-                    horarios[i][0].c_str(), horarios[i][1].c_str());
+                    horariosLaborales[i][0].c_str(), horariosLaborales[i][1].c_str());
     }
   }
-  server.sendHeader("Location", "/");
-  server.send(303);
+  servidor.sendHeader("Location", "/");
+  servidor.send(303);
 }
 
 // Handler para rutas no encontradas
-void handleNotFound()
+void manejarPaginaNoEncontrada()
 {
-  server.send(404, "text/plain", "Pagina no encontrada");
+  servidor.send(404, "text/plain", "Pagina no encontrada");
 }
