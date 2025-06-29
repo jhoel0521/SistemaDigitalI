@@ -3,6 +3,21 @@
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
+// Seccion de funciones del documento
+void manejarPaginaPrincipal();
+void manejarPaginaNoEncontrada();
+void manejarControlManual();
+void manejarActualizacionHorarios();
+void manejarConfiguracionHora();
+void enviarEstadoPorSocketWeb();
+void IRAM_ATTR manejarPIR1();
+void IRAM_ATTR manejarPIR2();
+void procesarInterrupcionesPIR();
+void actualizarRelojInterno();
+bool verificarSiEsHorarioLaboral();
+void configurarEstadoZona(int indiceZona, bool activar);
+void controlarApagadoAutomatico();
+// Fin de funciones del documento
 
 // Configuración WiFi
 const char *ssid = "SistemaDigitales";
@@ -158,8 +173,6 @@ void loop()
   procesarInterrupcionesPIR();
   controlarApagadoAutomatico();
 
-  
-
   delay(10);
 }
 
@@ -313,7 +326,8 @@ void actualizarRelojInterno()
   if (segundosTranscurridos > 0)
   {
     segundoActual += segundosTranscurridos;
-
+    // mostramo la hora actual
+    Serial.printf("Hora actual: %02d:%02d:%02d\n", horaActual, minutoActual, segundoActual);
     if (segundoActual >= 60)
     {
       minutoActual += segundoActual / 60;
