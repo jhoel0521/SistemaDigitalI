@@ -31,10 +31,7 @@ struct Zona
   unsigned long ultimoMovimiento;
   unsigned long tiempoEncendido; // Tiempo cuando se encendió
   bool estaActivo;
-  bool controlManual;
   String nombre;
-  int historialActividad[60]; // Historial de últimos 60 segundos
-  int punteroActividad;
   // constructor para inicializar la zona
   Zona(int pir, int relay1, int relay2, String nombre)
   {
@@ -44,13 +41,7 @@ struct Zona
     ultimoMovimiento = 0;
     tiempoEncendido = 0;
     estaActivo = false;
-    controlManual = false;
     this->nombre = nombre;
-    punteroActividad = 0;
-    for (int i = 0; i < 60; i++)
-    {
-      historialActividad[i] = 0;
-    }
   }
 };
 
@@ -79,27 +70,12 @@ unsigned long ultimaActualizacionSensor = 0;
 bool estadoSensoresAnterior[2] = {false, false};
 
 // Variables para el reloj manual
-int horaActual = 8;                        // Hora inicial: 8 AM
-int minutoActual = 0;                      // Minutos iniciales
-int segundoActual = 0;                     // Segundos iniciales
-unsigned long ultimaActualizacionTiempo = 0; // Para llevar el tiempo transcurrido
+int horaActual = 8;                    // Hora inicial: 8 AM
+int minutoActual = 0;                  // Minutos iniciales
+int segundoActual = 0;                 // Segundos iniciales
+unsigned long referenciaDelTiempo = 0; // Para llevar el tiempo transcurrido
 
-// Prototipos de funciones
-void IRAM_ATTR manejarPIR1();
-void IRAM_ATTR manejarPIR2();
-void procesarInterrupcionesPIR();
-void configurarEstadoZona(int indiceZona, bool activar);
-void controlarApagadoAutomatico();
-bool verificarSiEsHorarioLaboral();
-void actualizarRelojInterno();
-void manejarPaginaPrincipal();
-void manejarControlManual();
-void manejarActualizacionHorarios();
-void manejarConfiguracionHora();
-void manejarPaginaNoEncontrada();
 void eventoSocketWeb(uint8_t num, WStype_t type, uint8_t *payload, size_t length);
-void enviarEstadoPorSocketWeb();
-void actualizarHistorialActividad();
 
 void setup()
 {
@@ -116,11 +92,6 @@ void setup()
       pinMode(zonas[i].pinesRelay[j], OUTPUT);
       digitalWrite(zonas[i].pinesRelay[j], VALOR_RELAY_APAGADO);
     }
-    // Inicializar historial de actividad
-    for (int k = 0; k < 60; k++)
-    {
-      zonas[i].historialActividad[k] = 0;
-    }
   }
 
   // Configurar como punto de acceso WiFi
@@ -132,7 +103,7 @@ void setup()
   Serial.println(WiFi.softAPIP());
 
   // Iniciar el reloj interno
-  ultimaActualizacionTiempo = millis();
+  referenciaDelTiempo = millis();
 
   // Configurar interrupciones PIR seguras
   attachInterrupt(digitalPinToInterrupt(PIN_PIR1), manejarPIR1, RISING);
@@ -160,40 +131,45 @@ void loop()
   servidor.handleClient();
   socketWeb.loop();
   actualizarRelojInterno();
-  
+
   // Actualizar modo horario SIN resetear estados
   bool nuevoModoHorario = verificarSiEsHorarioLaboral();
-  if (estaEnHorarioLaboral != nuevoModoHorario) {
+  if (estaEnHorarioLaboral != nuevoModoHorario)
+  {
     estaEnHorarioLaboral = nuevoModoHorario;
     Serial.printf("Modo cambiado a: %s\n", estaEnHorarioLaboral ? "Horario Laboral" : "Fuera de Horario");
-    
+
     // Al cambiar a fuera de horario, actualizar ultimoMovimiento para todas las zonas activas
-    if (!estaEnHorarioLaboral) {
-      for (int i = 0; i < 2; i++) {
-        if (zonas[i].estaActivo) {
+    if (!estaEnHorarioLaboral)
+    {
+      for (int i = 0; i < 2; i++)
+      {
+        if (zonas[i].estaActivo)
+        {
           zonas[i].ultimoMovimiento = millis(); // Dar tiempo de gracia
           Serial.printf("Zona %d: Tiempo de movimiento actualizado por cambio de modo\n", i + 1);
         }
       }
     }
-    
+
     enviarEstadoPorSocketWeb(); // Enviar inmediatamente cuando cambie el modo
   }
-  
+
   procesarInterrupcionesPIR();
   controlarApagadoAutomatico();
-  actualizarHistorialActividad();
 
   // Verificar cambios en sensores para envío inmediato
   bool sensoresCambiaron = false;
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 2; i++)
+  {
     bool estadoActualSensor = digitalRead(zonas[i].pinPir);
-    if (estadoActualSensor != estadoSensoresAnterior[i]) {
+    if (estadoActualSensor != estadoSensoresAnterior[i])
+    {
       estadoSensoresAnterior[i] = estadoActualSensor;
       sensoresCambiaron = true;
     }
   }
-  
+
   // Enviar estado cada segundo o cuando cambien los sensores
   static unsigned long ultimaActualizacion = 0;
   if (millis() - ultimaActualizacion > 1000 || sensoresCambiaron)
@@ -246,47 +222,53 @@ void enviarEstadoPorSocketWeb()
     JsonObject objetoZona = arregloZonas.createNestedObject();
     objetoZona["nombre"] = zonas[i].nombre;
     objetoZona["activo"] = zonas[i].estaActivo;
-    objetoZona["manual"] = zonas[i].controlManual;
     objetoZona["movimiento"] = digitalRead(zonas[i].pinPir); // Estado actual del sensor
 
     // Calcular countdown si está activo
-    if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0) {
+    if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0)
+    {
       unsigned long tiempoRestante = 0;
-      
-      if (estaEnHorarioLaboral) {
+
+      if (estaEnHorarioLaboral)
+      {
         // En horario laboral: countdown desde activación
         unsigned long tiempoTranscurrido = millis() - zonas[i].tiempoEncendido;
         tiempoRestante = (TIEMPO_MAXIMO_ENCENDIDO > tiempoTranscurrido) ? (TIEMPO_MAXIMO_ENCENDIDO - tiempoTranscurrido) / 1000 : 0;
-      } else {
+      }
+      else
+      {
         // Fuera de horario: verificar movimiento global
         bool hayMovimientoGlobal = false;
-        for (int j = 0; j < 2; j++) {
-          if ((millis() - zonas[j].ultimoMovimiento) <= 30000) {
+        for (int j = 0; j < 2; j++)
+        {
+          if ((millis() - zonas[j].ultimoMovimiento) <= 30000)
+          {
             hayMovimientoGlobal = true;
             break;
           }
         }
-        
-        if (!hayMovimientoGlobal) {
+
+        if (!hayMovimientoGlobal)
+        {
           tiempoRestante = 0; // Se apagará inmediatamente
-        } else {
+        }
+        else
+        {
           // Hay movimiento: countdown desde activación
           unsigned long tiempoTranscurrido = millis() - zonas[i].tiempoEncendido;
           tiempoRestante = (TIEMPO_MAXIMO_ENCENDIDO > tiempoTranscurrido) ? (TIEMPO_MAXIMO_ENCENDIDO - tiempoTranscurrido) / 1000 : 0;
         }
       }
-      
+
       objetoZona["countdown"] = tiempoRestante;
-    } else {
+    }
+    else
+    {
       objetoZona["countdown"] = 0;
     }
 
     // Historial de actividad
     JsonArray actividadArray = objetoZona.createNestedArray("actividad");
-    for (int j = 0; j < 60; j++)
-    {
-      actividadArray.add(zonas[i].historialActividad[j]);
-    }
   }
 
   String cadenaJson;
@@ -294,38 +276,23 @@ void enviarEstadoPorSocketWeb()
   socketWeb.broadcastTXT(cadenaJson);
 }
 
-// Actualizar historial de actividad
-void actualizarHistorialActividad()
-{
-  static unsigned long ultimaActualizacion = 0;
-  if (millis() - ultimaActualizacion > 1000)
-  {
-    for (int i = 0; i < 2; i++)
-    {
-      zonas[i].punteroActividad = (zonas[i].punteroActividad + 1) % 60;
-      zonas[i].historialActividad[zonas[i].punteroActividad] = digitalRead(zonas[i].pinPir);
-    }
-    ultimaActualizacion = millis();
-  }
-}
-
 // Interrupciones seguras
 void IRAM_ATTR manejarPIR1()
 {
-  if (estaEnHorarioLaboral) return; // Solo procesar fuera de horario laboral
-  
+  if (estaEnHorarioLaboral)
+    return; // Solo procesar fuera de horario laboral
+
   pir1Disparado = true;
   tiempoPir1 = millis();
-  Serial.println("PIR1 detectado (fuera de horario)");
 }
 
 void IRAM_ATTR manejarPIR2()
 {
-  if (estaEnHorarioLaboral) return; // Solo procesar fuera de horario laboral
-  
+  if (estaEnHorarioLaboral)
+    return; // Solo procesar fuera de horario laboral
+
   pir2Disparado = true;
   tiempoPir2 = millis();
-  Serial.println("PIR2 detectado (fuera de horario)");
 }
 
 // Procesar interrupciones en el loop principal
@@ -356,7 +323,7 @@ void procesarInterrupcionesPIR()
 void actualizarRelojInterno()
 {
   unsigned long tiempoActual = millis();
-  unsigned long segundosTranscurridos = (tiempoActual - ultimaActualizacionTiempo) / 1000;
+  unsigned long segundosTranscurridos = (tiempoActual - referenciaDelTiempo) / 1000;
 
   if (segundosTranscurridos > 0)
   {
@@ -378,7 +345,7 @@ void actualizarRelojInterno()
         }
       }
     }
-    ultimaActualizacionTiempo = tiempoActual;
+    referenciaDelTiempo = tiempoActual;
   }
 }
 
@@ -386,12 +353,15 @@ void actualizarRelojInterno()
 void configurarEstadoZona(int indiceZona, bool activar)
 {
   zonas[indiceZona].estaActivo = activar;
-  if (activar) {
+  if (activar)
+  {
     zonas[indiceZona].tiempoEncendido = millis();
-  } else {
+  }
+  else
+  {
     zonas[indiceZona].tiempoEncendido = 0;
   }
-  
+
   for (int i = 0; i < 2; i++)
   {
     digitalWrite(zonas[indiceZona].pinesRelay[i], activar ? VALOR_RELAY_ENCENDIDO : VALOR_RELAY_APAGADO);
@@ -414,7 +384,6 @@ void controlarApagadoAutomatico()
         if (tiempoEncendido > TIEMPO_MAXIMO_ENCENDIDO)
         {
           configurarEstadoZona(i, false);
-          zonas[i].controlManual = false;
           Serial.printf("Zona %d apagada por timeout (horario laboral)\n", i + 1);
         }
       }
@@ -424,39 +393,47 @@ void controlarApagadoAutomatico()
   {
     // FUERA DE HORARIO: Lógica principal de control
     bool hayMovimientoGlobal = false;
-    
+
     // Verificar si hay movimiento reciente en cualquier zona
-    for (int i = 0; i < 2; i++) {
-      if ((tiempoActual - zonas[i].ultimoMovimiento) <= 30000) { // 30 segundos de gracia
+    for (int i = 0; i < 2; i++)
+    {
+      if ((tiempoActual - zonas[i].ultimoMovimiento) <= 30000)
+      { // 30 segundos de gracia
         hayMovimientoGlobal = true;
         break;
       }
     }
-    
+
     // Si NO hay movimiento global, apagar TODAS las zonas
-    if (!hayMovimientoGlobal) {
+    if (!hayMovimientoGlobal)
+    {
       bool algunaZonaApagada = false;
-      for (int i = 0; i < 2; i++) {
-        if (zonas[i].estaActivo) {
+      for (int i = 0; i < 2; i++)
+      {
+        if (zonas[i].estaActivo)
+        {
           configurarEstadoZona(i, false);
-          zonas[i].controlManual = false;
           algunaZonaApagada = true;
         }
       }
-      if (algunaZonaApagada) {
+      if (algunaZonaApagada)
+      {
         Serial.println("TODAS las zonas apagadas - Sin movimiento fuera de horario");
       }
     }
-    else {
+    else
+    {
       // HAY movimiento: mantener countdown individual
-      for (int i = 0; i < 2; i++) {
-        if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0) {
+      for (int i = 0; i < 2; i++)
+      {
+        if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0)
+        {
           unsigned long tiempoEncendido = tiempoActual - zonas[i].tiempoEncendido;
-          
+
           // Apagar si excede el tiempo máximo (5 minutos)
-          if (tiempoEncendido > TIEMPO_MAXIMO_ENCENDIDO) {
+          if (tiempoEncendido > TIEMPO_MAXIMO_ENCENDIDO)
+          {
             configurarEstadoZona(i, false);
-            zonas[i].controlManual = false;
             Serial.printf("Zona %d apagada por timeout máximo (5 min)\n", i + 1);
           }
         }
@@ -826,7 +803,7 @@ void manejarPaginaPrincipal()
             <div class="card-header">
                 <div class="card-title">Configuración</div>
             </div>
-            <form action="/update" method="post">
+            <form action="/update" method="post" id="schedule-form">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Horario 1:</label>
@@ -995,7 +972,7 @@ void manejarConfiguracionHora()
       horaActual = hora;
       minutoActual = minuto;
       segundoActual = 0;
-      ultimaActualizacionTiempo = millis();
+      referenciaDelTiempo = millis();
       Serial.printf("Hora actualizada: %02d:%02d\n", hora, minuto);
     }
   }
@@ -1012,21 +989,25 @@ void manejarControlManual()
     if (indiceZona >= 0 && indiceZona < 2)
     {
       bool encender = (servidor.uri() == "/on");
-      
-      if (encender) {
-        zonas[indiceZona].controlManual = true;
+
+      if (encender)
+      {
         configurarEstadoZona(indiceZona, true);
-        
+
         // Establecer tiempo de movimiento para mantener la luz
         zonas[indiceZona].ultimoMovimiento = millis();
-        
-        if (!estaEnHorarioLaboral) {
+
+        if (!estaEnHorarioLaboral)
+        {
           Serial.printf("Zona %d encendida manualmente (fuera de horario)\n", indiceZona + 1);
-        } else {
+        }
+        else
+        {
           Serial.printf("Zona %d encendida manualmente (horario laboral)\n", indiceZona + 1);
         }
-      } else {
-        zonas[indiceZona].controlManual = false;
+      }
+      else
+      {
         configurarEstadoZona(indiceZona, false);
         Serial.printf("Zona %d apagada manualmente\n", indiceZona + 1);
       }
