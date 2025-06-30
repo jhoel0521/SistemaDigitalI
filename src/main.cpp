@@ -19,22 +19,8 @@ bool verificarSiEsHorarioLaboral();
 void configurarEstadoZona(int indiceZona, bool activar);
 void controlarApagadoAutomatico();
 
-// Configuración WiFi  servidor.sendContent_P(PSTR("if(zona.countdown&&zona.countdown>0){"));
-  servidor.sendContent_P(PSTR("const countdownElement=document.getElementById(`zone-${idx}-countdown`);"));
-  servidor.sendContent_P(PSTR("countdownElement.style.display='block';"));
-  servidor.sendContent_P(PSTR("const minutes=Math.floor(zona.countdown/60);"));
-  servidor.sendContent_P(PSTR("const seconds=zona.countdown%60;"));
-  servidor.sendContent_P(PSTR("countdownElement.textContent=`Apagado en: ${minutes}:${String(seconds).padStart(2,'0')}`;"));
-  servidor.sendContent_P(PSTR("}else{"));
-  servidor.sendContent_P(PSTR("const countdownElement=document.getElementById(`zone-${idx}-countdown`);"));
-  servidor.sendContent_P(PSTR("if(isHorarioLaboral&&zona.activo){"));
-  servidor.sendContent_P(PSTR("countdownElement.style.display='block';"));
-  servidor.sendContent_P(PSTR("countdownElement.textContent='Modo trabajo: Sin límite de tiempo';"));
-  servidor.sendContent_P(PSTR("countdownElement.style.color='#28a745';"));
-  servidor.sendContent_P(PSTR("}else{"));
-  servidor.sendContent_P(PSTR("countdownElement.style.display='none';"));
-  servidor.sendContent_P(PSTR("countdownElement.style.color='var(--warning)';"));
-  servidor.sendContent_P(PSTR("}}"));char *ssid = "SistemaDigitales";
+// Configuración WiFi
+const char *ssid = "SistemaDigitales";
 const char *password = "12345678";
 
 // Configuración de pines

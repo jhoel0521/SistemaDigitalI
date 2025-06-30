@@ -72,6 +72,45 @@
             margin-bottom: 15px;
         }
 
+        .mode-banner {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-horario {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: 2px solid #1e7e34;
+        }
+
+        .mode-fuera-horario {
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
+            color: white;
+            border: 2px solid #721c24;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
         #real-time-clock {
             font-size: 2.2rem;
             font-weight: 700;
@@ -190,6 +229,59 @@
         .disconnected {
             background-color: #f72585;
         }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin-top: 8px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--success);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(26px);
+        }
+
+        .countdown-display {
+            font-size: 0.8rem;
+            color: var(--warning);
+            margin-top: 5px;
+            font-weight: 600;
+        }
     </style>
 </head>
 
@@ -197,139 +289,71 @@
     <div class="container">
         <div class="card">
             <div class="clock-container">
-                <div id="real-time-clock">00:00:00</div>
+                <div id="real-time-clock">--:--:--</div>
                 <div class="mode-indicator" id="mode-indicator">Modo: Cargando...</div>
                 <div class="connection-status">
-                    <div class="connection-dot disconnected" id="connection-dot"></div>
-                    <span id="connection-status">Desconectado</span>
+                    <div class="connection-dot disconnected" id="connection-dot"></div> <span
+                        id="connection-status">Desconectado</span>
                 </div>
             </div>
-
+            <div class="mode-banner mode-horario" id="mode-banner"> 🕐 HORARIO LABORAL ACTIVO </div>
             <div class="grid-2">
                 <div class="zone-card" id="zone-1-card">
                     <div class="zone-title">Zona 1</div>
                     <div class="zone-status" id="zone-1-status">APAGADO</div>
                     <div><span class="sensor-indicator" id="zone-1-sensor"></span> Sensor de movimiento</div>
-                    <div class="actions">
-                        <a href="/on?zona=0" class="btn btn-primary">Encender</a>
-                        <a href="/off?zona=0" class="btn btn-danger">Apagar</a>
+                    <div class="actions"> <label class="switch"> <input type="checkbox" id="zone-1-switch"
+                                onchange="toggleZone(0, this.checked)"> <span class="slider"></span> </label>
+                        <div class="countdown-display" id="zone-1-countdown" style="display: none;"></div>
                     </div>
                 </div>
-
                 <div class="zone-card" id="zone-2-card">
                     <div class="zone-title">Zona 2</div>
                     <div class="zone-status" id="zone-2-status">APAGADO</div>
                     <div><span class="sensor-indicator" id="zone-2-sensor"></span> Sensor de movimiento</div>
-                    <div class="actions">
-                        <a href="/on?zona=1" class="btn btn-primary">Encender</a>
-                        <a href="/off?zona=1" class="btn btn-danger">Apagar</a>
+                    <div class="actions"> <label class="switch"> <input type="checkbox" id="zone-2-switch"
+                                onchange="toggleZone(1, this.checked)"> <span class="slider"></span> </label>
+                        <div class="countdown-display" id="zone-2-countdown" style="display: none;"></div>
                     </div>
                 </div>
             </div>
         </div>
-
         <div class="card">
             <div class="card-header">
-                <div class="card-title">Estado de Movimiento</div>
+                <div class="card-title">Estado de Sensores de Movimiento</div>
             </div>
             <div style="padding: 10px;">
-                <p id="movimiento-zona-1">Zona 1: Sin movimiento</p>
-                <p id="movimiento-zona-2">Zona 2: Sin movimiento</p>
+                <p id="movimiento-zona-1"
+                    style="margin: 8px 0; padding: 8px; border-radius: 5px; background-color: #f8f9fa;">Zona 1: Sin
+                    movimiento</p>
+                <p id="movimiento-zona-2"
+                    style="margin: 8px 0; padding: 8px; border-radius: 5px; background-color: #f8f9fa;">Zona 2: Sin
+                    movimiento</p>
             </div>
         </div>
-
         <div class="card">
             <div class="card-header">
                 <div class="card-title">Configuración</div>
             </div>
-            <form action="/update" method="post">
+            <form action="/update" method="post" id="schedule-form">
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Horario 1:</label>
-                        <input type="time" name="inicio0" value="08:00">
+                    <div class="form-group"> <label>Horario 1:</label> <input type="time" name="inicio0" value="08:00">
                         <input type="time" name="fin0" value="12:00" style="margin-top: 5px;">
                     </div>
-                    <div class="form-group">
-                        <label>Horario 2:</label>
-                        <input type="time" name="inicio1" value="14:00">
-                        <input type="time" name="fin1" value="18:00" style="margin-top: 5px;">
+                    <div class="form-group"> <label>Horario 2:</label> <input type="time" name="inicio1" value="14:00">
+                        <input type="time" name="fin1" value="19:45" style="margin-top: 5px;">
                     </div>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Actualizar
+                </div> <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Actualizar
                     Horarios</button>
             </form>
             <form action="/settime" method="post" style="margin-top: 15px;">
-                <div class="form-group">
-                    <label>Hora actual (HH:MM):</label>
-                    <input type="text" name="time" id="manual-time" placeholder="HH:MM">
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Establecer Hora</button>
+                <div class="form-group"> <label>Hora actual (HH:MM):</label> <input type="text" name="time"
+                        id="manual-time" placeholder="HH:MM"> </div> <button type="submit" class="btn btn-primary"
+                    style="width: 100%;">Establecer Hora</button>
             </form>
         </div>
     </div>
-
-    <script>
-        const connectionDot = document.getElementById('connection-dot');
-        const connectionStatus = document.getElementById('connection-status');
-
-        function updateClock() {
-            const now = new Date();
-            const h = String(now.getHours()).padStart(2, '0');
-            const m = String(now.getMinutes()).padStart(2, '0');
-            const s = String(now.getSeconds()).padStart(2, '0');
-            document.getElementById('real-time-clock').textContent = `${h}:${m}:${s}`;
-        }
-
-        updateClock();
-        setInterval(updateClock, 1000);
-
-        let socket;
-        const host = window.location.hostname;
-
-        function initWebSocket() {
-            socket = new WebSocket(`ws://${host}:81/`);
-
-            socket.addEventListener('open', () => {
-                connectionDot.classList.remove('disconnected');
-                connectionDot.classList.add('connected');
-                connectionStatus.textContent = 'Conectado';
-            });
-
-            socket.addEventListener('message', (event) => {
-                const data = JSON.parse(event.data);
-                document.getElementById('real-time-clock').textContent = `${String(data.hora).padStart(2, '0')}:${String(data.minuto).padStart(2, '0')}:${String(data.segundo).padStart(2, '0')}`;
-                document.getElementById('mode-indicator').textContent = `Modo: ${data.modo}`;
-
-                data.zonas.forEach((zona, index) => {
-                    const idx = index + 1;
-                    document.getElementById(`zone-${idx}-status`).textContent = zona.activo ? 'ENCENDIDO' : 'APAGADO';
-                    document.getElementById(`zone-${idx}-status`).style.color = zona.activo ? '#4cc9f0' : '#f72585';
-
-                    const sensorActivo = zona.movimiento === 1;
-                    const sensor = document.getElementById(`zone-${idx}-sensor`);
-                    sensor.classList.toggle('sensor-active', sensorActivo);
-                    sensor.classList.toggle('sensor-inactive', !sensorActivo);
-
-                    document.getElementById(`movimiento-zona-${idx}`).textContent = `Zona ${idx}: ` + (sensorActivo ? 'Se está detectando movimiento' : 'Sin movimiento');
-                });
-            });
-
-            socket.addEventListener('close', () => {
-                connectionDot.classList.remove('connected');
-                connectionDot.classList.add('disconnected');
-                connectionStatus.textContent = 'Desconectado, reconectando...';
-                setTimeout(initWebSocket, 3000);
-            });
-
-            socket.addEventListener('error', () => socket.close());
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const now = new Date();
-            document.getElementById('manual-time').value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            initWebSocket();
-        });
-    </script>
+    <script>        const connectionDot = document.getElementById('connection-dot'); const connectionStatus = document.getElementById('connection-status'); let socket; const host = window.location.hostname; function initWebSocket() { socket = new WebSocket(`ws://${host}:81/`); socket.addEventListener('open', () => { connectionDot.classList.remove('disconnected'); connectionDot.classList.add('connected'); connectionStatus.textContent = 'Conectado'; syncTimeAutomatically(); }); socket.addEventListener('message', (event) => { const data = JSON.parse(event.data); document.getElementById('real-time-clock').textContent = `${String(data.hora).padStart(2, '0')}:${String(data.minuto).padStart(2, '0')}:${String(data.segundo).padStart(2, '0')}`; document.getElementById('mode-indicator').textContent = `Modo: ${data.modo}`; const modeBanner = document.getElementById('mode-banner'); const isHorarioLaboral = data.modo === 'Horario Laboral'; modeBanner.className = `mode-banner ${isHorarioLaboral ? 'mode-horario' : 'mode-fuera-horario'}`; modeBanner.innerHTML = isHorarioLaboral ? '🕐 HORARIO LABORAL ACTIVO<br><small>Sensores desactivados</small>' : '🚨 FUERA DE HORARIO<br><small>Sensores de seguridad activos</small>'; data.zonas.forEach((zona, index) => { const idx = index + 1; document.getElementById(`zone-${idx}-status`).textContent = zona.activo ? 'ENCENDIDO' : 'APAGADO'; document.getElementById(`zone-${idx}-status`).style.color = zona.activo ? '#4cc9f0' : '#f72585'; const switchElement = document.getElementById(`zone-${idx}-switch`); switchElement.onchange = null; switchElement.checked = zona.activo; switchElement.onchange = function () { toggleZone(index, this.checked); }; if (zona.countdown && zona.countdown > 0) { const countdownElement = document.getElementById(`zone-${idx}-countdown`); countdownElement.style.display = 'block'; const minutes = Math.floor(zona.countdown / 60); const seconds = zona.countdown % 60; countdownElement.textContent = `Apagado en: ${minutes}:${String(seconds).padStart(2, '0')}`; } else { document.getElementById(`zone-${idx}-countdown`).style.display = 'none'; } const sensorActivo = zona.movimiento === 1; const sensor = document.getElementById(`zone-${idx}-sensor`); sensor.classList.toggle('sensor-active', sensorActivo); sensor.classList.toggle('sensor-inactive', !sensorActivo); const movimientoElement = document.getElementById(`movimiento-zona-${idx}`); if (isHorarioLaboral) { movimientoElement.textContent = `Zona ${idx}: Sensor desactivado (horario laboral)`; movimientoElement.style.color = '#6c757d'; } else { movimientoElement.textContent = `Zona ${idx}: ` + (sensorActivo ? '🔴 MOVIMIENTO DETECTADO' : '🟢 Sin movimiento'); movimientoElement.style.color = sensorActivo ? '#dc3545' : '#28a745'; movimientoElement.style.fontWeight = sensorActivo ? 'bold' : 'normal'; } }); }); socket.addEventListener('close', () => { connectionDot.classList.remove('connected'); connectionDot.classList.add('disconnected'); connectionStatus.textContent = 'Desconectado, reconectando...'; setTimeout(initWebSocket, 3000); }); socket.addEventListener('error', () => socket.close()); } document.addEventListener('DOMContentLoaded', () => { const now = new Date(); document.getElementById('manual-time').value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; initWebSocket(); }); function toggleZone(zona, estado) { const url = estado ? `/on?zona=${zona}` : `/off?zona=${zona}`; fetch(url).then(response => { if (!response.ok) { console.error('Error al cambiar estado de zona'); } }).catch(err => { console.error('Error:', err); }); } function syncTimeAutomatically() { const now = new Date(); const timeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; fetch('/settime', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', }, body: `time=${timeString}` }).then(() => { console.log('Hora sincronizada automáticamente:', timeString); }).catch(err => { console.error('Error sincronizando hora:', err); }); }    </script>
 </body>
 
 </html>
