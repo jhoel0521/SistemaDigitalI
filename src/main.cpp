@@ -3,7 +3,7 @@
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
-// Seccion de funciones del documento
+// Declaraciones de funciones
 void manejarPaginaPrincipal();
 void enviarJavaScript();
 void manejarPaginaNoEncontrada();
@@ -18,7 +18,6 @@ void actualizarRelojInterno();
 bool verificarSiEsHorarioLaboral();
 void configurarEstadoZona(int indiceZona, bool activar);
 void controlarApagadoAutomatico();
-// Fin de funciones del documento
 
 // Configuración WiFi
 const char *ssid = "SistemaDigitales";
@@ -86,7 +85,7 @@ unsigned long ultimaActualizacionSensor = 0;
 bool estadoSensoresAnterior[2] = {false, false};
 
 // Variables para el reloj manual
-int horaActual = 8;                    // Hora inicial: 8 AM
+int horaActual = 19;                   // Hora inicial: 7 PM (fuera de horario para probar)
 int minutoActual = 0;                  // Minutos iniciales
 int segundoActual = 0;                 // Segundos iniciales
 unsigned long referenciaDelTiempo = 0; // Para llevar el tiempo transcurrido
@@ -163,7 +162,9 @@ void loop()
   if (estaEnHorarioLaboral != nuevoModoHorario)
   {
     estaEnHorarioLaboral = nuevoModoHorario;
-    Serial.printf("Modo cambiado a: %s\n", estaEnHorarioLaboral ? "Horario Laboral" : "Fuera de Horario");
+    Serial.printf("*** CAMBIO DE MODO *** De %s a %s\n", 
+      !estaEnHorarioLaboral ? "Horario Laboral" : "Fuera de Horario",
+      estaEnHorarioLaboral ? "Horario Laboral" : "Fuera de Horario");
 
     // Al cambiar a fuera de horario, actualizar ultimoMovimiento para todas las zonas activas
     if (!estaEnHorarioLaboral)
@@ -303,8 +304,10 @@ void enviarEstadoPorSocketWeb()
   // Debug: mostrar datos enviados cada 10 segundos para no saturar
   static unsigned long ultimoDebug = 0;
   if (millis() - ultimoDebug > 10000) {
-    Serial.printf("WebSocket - Modo: %s, Hora: %02d:%02d:%02d\n", 
-      estaEnHorarioLaboral ? "Laboral" : "Fuera", horaActual, minutoActual, segundoActual);
+    Serial.printf("WebSocket - Modo: %s (%s), Hora: %02d:%02d:%02d\n", 
+      estaEnHorarioLaboral ? "Laboral" : "Fuera", 
+      estaEnHorarioLaboral ? "true" : "false",
+      horaActual, minutoActual, segundoActual);
     for (int i = 0; i < 2; i++) {
       unsigned long tiempoDesdeMovimiento = 0;
       if (zonas[i].ultimoMovimiento > 0) {
@@ -631,16 +634,21 @@ void enviarJavaScript()
   
   servidor.sendContent_P(PSTR("socket.addEventListener('message',(event)=>{"));
   servidor.sendContent_P(PSTR("const data=JSON.parse(event.data);"));
+  servidor.sendContent_P(PSTR("console.log('WebSocket recibido:',data);"));  // Debug
   servidor.sendContent_P(PSTR("document.getElementById('real-time-clock').textContent="));
   servidor.sendContent_P(PSTR("`${String(data.hora).padStart(2,'0')}:${String(data.minuto).padStart(2,'0')}:${String(data.segundo).padStart(2,'0')}`;"));
   servidor.sendContent_P(PSTR("document.getElementById('mode-indicator').textContent=`Modo: ${data.modo}`;"));
   
   servidor.sendContent_P(PSTR("const modeBanner=document.getElementById('mode-banner');"));
-  servidor.sendContent_P(PSTR("const isHorarioLaboral=data.modoActivo===true;"));
-  servidor.sendContent_P(PSTR("modeBanner.className=`mode-banner ${isHorarioLaboral?'mode-horario':'mode-fuera-horario'}`;"));
-  servidor.sendContent_P(PSTR("modeBanner.innerHTML=isHorarioLaboral?"));
-  servidor.sendContent_P(PSTR("'🕐 HORARIO LABORAL ACTIVO<br><small>Sensores desactivados</small>':"));
-  servidor.sendContent_P(PSTR("'🚨 FUERA DE HORARIO<br><small>Sensores de seguridad activos</small>';"));
+  servidor.sendContent_P(PSTR("const isHorarioLaboral=data.modoActivo;"));  // Usar directamente el boolean
+  servidor.sendContent_P(PSTR("console.log('Modo activo:',isHorarioLaboral);"));  // Debug
+  servidor.sendContent_P(PSTR("if(isHorarioLaboral){"));
+  servidor.sendContent_P(PSTR("modeBanner.className='mode-banner mode-horario';"));
+  servidor.sendContent_P(PSTR("modeBanner.innerHTML='🕐 HORARIO LABORAL ACTIVO<br><small>Sensores desactivados</small>';"));
+  servidor.sendContent_P(PSTR("}else{"));
+  servidor.sendContent_P(PSTR("modeBanner.className='mode-banner mode-fuera-horario';"));
+  servidor.sendContent_P(PSTR("modeBanner.innerHTML='🚨 FUERA DE HORARIO<br><small>Sensores de seguridad activos</small>';"));
+  servidor.sendContent_P(PSTR("}"));
   
   servidor.sendContent_P(PSTR("data.zonas.forEach((zona,index)=>{"));
   servidor.sendContent_P(PSTR("const idx=index+1;"));
