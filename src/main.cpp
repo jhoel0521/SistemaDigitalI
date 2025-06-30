@@ -19,8 +19,22 @@ bool verificarSiEsHorarioLaboral();
 void configurarEstadoZona(int indiceZona, bool activar);
 void controlarApagadoAutomatico();
 
-// Configuración WiFi
-const char *ssid = "SistemaDigitales";
+// Configuración WiFi  servidor.sendContent_P(PSTR("if(zona.countdown&&zona.countdown>0){"));
+  servidor.sendContent_P(PSTR("const countdownElement=document.getElementById(`zone-${idx}-countdown`);"));
+  servidor.sendContent_P(PSTR("countdownElement.style.display='block';"));
+  servidor.sendContent_P(PSTR("const minutes=Math.floor(zona.countdown/60);"));
+  servidor.sendContent_P(PSTR("const seconds=zona.countdown%60;"));
+  servidor.sendContent_P(PSTR("countdownElement.textContent=`Apagado en: ${minutes}:${String(seconds).padStart(2,'0')}`;"));
+  servidor.sendContent_P(PSTR("}else{"));
+  servidor.sendContent_P(PSTR("const countdownElement=document.getElementById(`zone-${idx}-countdown`);"));
+  servidor.sendContent_P(PSTR("if(isHorarioLaboral&&zona.activo){"));
+  servidor.sendContent_P(PSTR("countdownElement.style.display='block';"));
+  servidor.sendContent_P(PSTR("countdownElement.textContent='Modo trabajo: Sin límite de tiempo';"));
+  servidor.sendContent_P(PSTR("countdownElement.style.color='#28a745';"));
+  servidor.sendContent_P(PSTR("}else{"));
+  servidor.sendContent_P(PSTR("countdownElement.style.display='none';"));
+  servidor.sendContent_P(PSTR("countdownElement.style.color='var(--warning)';"));
+  servidor.sendContent_P(PSTR("}}"));char *ssid = "SistemaDigitales";
 const char *password = "12345678";
 
 // Configuración de pines
@@ -257,13 +271,12 @@ void enviarEstadoPorSocketWeb()
 
       if (estaEnHorarioLaboral)
       {
-        // En horario laboral: countdown desde activación
-        unsigned long tiempoTranscurrido = millis() - zonas[i].tiempoEncendido;
-        tiempoRestante = (TIEMPO_MAXIMO_ENCENDIDO > tiempoTranscurrido) ? (TIEMPO_MAXIMO_ENCENDIDO - tiempoTranscurrido) / 1000 : 0;
+        // EN HORARIO LABORAL: SIN COUNTDOWN - Las luces permanecen encendidas para trabajar
+        tiempoRestante = 0; // No hay countdown en horario laboral
       }
       else
       {
-        // Fuera de horario: verificar movimiento global
+        // FUERA DE HORARIO: Sistema de seguridad con countdown
         bool hayMovimientoGlobal = false;
         for (int j = 0; j < 2; j++)
         {
@@ -435,9 +448,15 @@ void controlarApagadoAutomatico()
 {
   unsigned long tiempoActual = millis();
 
-  if (!estaEnHorarioLaboral)
+  if (estaEnHorarioLaboral)
   {
-    // FUERA DE HORARIO: Lógica principal de control
+    // EN HORARIO LABORAL: NO se apagan automáticamente las luces
+    // Las luces permanecen encendidas para permitir el trabajo sin interrupciones
+    return; // No hacer nada durante horario laboral
+  }
+  else
+  {
+    // FUERA DE HORARIO: Sistema de seguridad - Lógica principal de control
     bool hayMovimientoGlobal = false;
 
     // Verificar si hay movimiento reciente en cualquier zona
@@ -459,7 +478,7 @@ void controlarApagadoAutomatico()
         if (zonas[i].estaActivo)
         {
           configurarEstadoZona(i, false);
-          Serial.printf("Zona %d apagada por falta de movimiento\n", i + 1);
+          Serial.printf("Zona %d apagada por falta de movimiento (fuera de horario)\n", i + 1);
         }
       }
     }
@@ -476,7 +495,7 @@ void controlarApagadoAutomatico()
           if (tiempoEncendido > TIEMPO_MAXIMO_ENCENDIDO)
           {
             configurarEstadoZona(i, false);
-            Serial.printf("Zona %d apagada por timeout máximo (5 min)\n", i + 1);
+            Serial.printf("Zona %d apagada por timeout máximo (5 min) - fuera de horario\n", i + 1);
           }
         }
       }
