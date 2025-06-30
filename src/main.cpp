@@ -139,6 +139,16 @@ void setup()
   servidor.begin();
   Serial.println("Servidor HTTP iniciado");
   Serial.println("Servidor WebSocket iniciado en puerto 81");
+  
+  // Inicializar estado del sistema
+  estaEnHorarioLaboral = verificarSiEsHorarioLaboral();
+  Serial.printf("Estado inicial: %s\n", estaEnHorarioLaboral ? "Horario Laboral" : "Fuera de Horario");
+  
+  // Mostrar estado inicial de las zonas
+  for (int i = 0; i < 2; i++) {
+    Serial.printf("Zona %d: %s, PIR pin %d, Relays %d y %d\n", 
+      i+1, zonas[i].nombre.c_str(), zonas[i].pinPir, zonas[i].pinesRelay[0], zonas[i].pinesRelay[1]);
+  }
 }
 
 void loop()
@@ -173,6 +183,14 @@ void loop()
   procesarInterrupcionesPIR();
   controlarApagadoAutomatico();
 
+  // Enviar estado WebSocket más frecuentemente para mejor sincronización
+  static unsigned long ultimoEnvioWebSocket = 0;
+  if (millis() - ultimoEnvioWebSocket > 500) // Cada 500ms
+  {
+    enviarEstadoPorSocketWeb();
+    ultimoEnvioWebSocket = millis();
+  }
+
   delay(10);
 }
 
@@ -200,7 +218,7 @@ void eventoSocketWeb(uint8_t num, WStype_t type, uint8_t *payload, size_t length
 // Enviar estado actual a todos los clientes WebSocket
 void enviarEstadoPorSocketWeb()
 {
-  DynamicJsonDocument documento(1024);
+  JsonDocument documento;
 
   // Hora actual
   documento["hora"] = horaActual;
@@ -212,14 +230,24 @@ void enviarEstadoPorSocketWeb()
   documento["modoActivo"] = estaEnHorarioLaboral;
 
   // Estado de zonas
-  JsonArray arregloZonas = documento.createNestedArray("zonas");
+  JsonArray arregloZonas = documento["zonas"].to<JsonArray>();
   for (int i = 0; i < 2; i++)
   {
-    JsonObject objetoZona = arregloZonas.createNestedObject();
+    JsonObject objetoZona = arregloZonas.add<JsonObject>();
     objetoZona["nombre"] = zonas[i].nombre;
     objetoZona["activo"] = zonas[i].estaActivo;
-    objetoZona["movimiento"] = digitalRead(zonas[i].pinPir); // Estado actual del sensor
-
+    
+    // Calcular tiempo desde último movimiento de forma segura
+    unsigned long tiempoDesdeMovimiento = 0;
+    if (zonas[i].ultimoMovimiento > 0) {
+      tiempoDesdeMovimiento = (millis() - zonas[i].ultimoMovimiento) / 1000;
+    } else {
+      tiempoDesdeMovimiento = 999999; // Nunca hubo movimiento
+    }
+    objetoZona["movimiento"] = tiempoDesdeMovimiento;
+    
+    objetoZona["tiempoEncendido"] = zonas[i].tiempoEncendido > 0 ? (millis() - zonas[i].tiempoEncendido) / 1000 : 0; // Tiempo desde que se encendió
+    objetoZona["sensorActual"] = digitalRead(zonas[i].pinPir); // Estado actual del sensor PIR
     // Calcular countdown si está activo
     if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0)
     {
@@ -263,13 +291,40 @@ void enviarEstadoPorSocketWeb()
       objetoZona["countdown"] = 0;
     }
 
-    // Historial de actividad
-    JsonArray actividadArray = objetoZona.createNestedArray("actividad");
+    // Historial de actividad (opcional, para futuras expansiones)
+    JsonArray actividadArray = objetoZona["actividad"].to<JsonArray>();
   }
 
   String cadenaJson;
   serializeJson(documento, cadenaJson);
   socketWeb.broadcastTXT(cadenaJson);
+  
+  // Debug: mostrar datos enviados
+  Serial.printf("WebSocket enviado - Modo: %s, Hora: %02d:%02d:%02d\n", 
+    estaEnHorarioLaboral ? "Laboral" : "Fuera", horaActual, minutoActual, segundoActual);
+  for (int i = 0; i < 2; i++) {
+    unsigned long tiempoDesdeMovimiento = 0;
+    if (zonas[i].ultimoMovimiento > 0) {
+      tiempoDesdeMovimiento = (millis() - zonas[i].ultimoMovimiento) / 1000;
+    } else {
+      tiempoDesdeMovimiento = 999999;
+    }
+    Serial.printf("  Zona %d: activo=%s, movimiento=%lus, PIR=%d\n", 
+      i+1, zonas[i].estaActivo ? "SI" : "NO", tiempoDesdeMovimiento, digitalRead(zonas[i].pinPir));
+  }
+  
+  // Debug: mostrar datos enviados
+  Serial.println("Datos WebSocket enviados:");
+  Serial.printf("Modo: %s (%s)\n", 
+    estaEnHorarioLaboral ? "Horario Laboral" : "Fuera de Horario",
+    estaEnHorarioLaboral ? "true" : "false");
+  for (int i = 0; i < 2; i++) {
+    Serial.printf("Zona %d: Activo=%s, UltimoMov=%lus, SensorPIR=%d\n", 
+      i+1, 
+      zonas[i].estaActivo ? "SI" : "NO",
+      zonas[i].ultimoMovimiento > 0 ? (millis() - zonas[i].ultimoMovimiento) / 1000 : 0,
+      digitalRead(zonas[i].pinPir));
+  }
 }
 
 // Interrupciones seguras
@@ -306,13 +361,15 @@ void procesarInterrupcionesPIR()
     {
       pir1Disparado = false;
       zonas[0].ultimoMovimiento = tiempoPir1;
-      Serial.println("Zona 1: Movimiento detectado - actualizando temporizador");
+      Serial.printf("Zona 1: Movimiento detectado en tiempo %lu ms\n", tiempoPir1);
+      
     }
     if (pir2Disparado)
     {
       pir2Disparado = false;
       zonas[1].ultimoMovimiento = tiempoPir2;
-      Serial.println("Zona 2: Movimiento detectado - actualizando temporizador");
+      Serial.printf("Zona 2: Movimiento detectado en tiempo %lu ms\n", tiempoPir2);
+      
     }
   }
 }
@@ -355,10 +412,12 @@ void configurarEstadoZona(int indiceZona, bool activar)
   if (activar)
   {
     zonas[indiceZona].tiempoEncendido = millis();
+    Serial.printf("Zona %d: ENCENDIDA en tiempo %lu ms\n", indiceZona + 1, zonas[indiceZona].tiempoEncendido);
   }
   else
   {
     zonas[indiceZona].tiempoEncendido = 0;
+    Serial.printf("Zona %d: APAGADA\n", indiceZona + 1);
   }
 
   for (int i = 0; i < 2; i++)
@@ -601,22 +660,35 @@ void manejarPaginaPrincipal()
             });\
             socket.addEventListener('message', (event) => {\
                 const data = JSON.parse(event.data);\
+                \
+                // Actualizar reloj con hora del ESP32\
                 document.getElementById('real-time-clock').textContent = `${String(data.hora).padStart(2, '0')}:${String(data.minuto).padStart(2, '0')}:${String(data.segundo).padStart(2, '0')}`;\
                 document.getElementById('mode-indicator').textContent = `Modo: ${data.modo}`;\
+                \
+                // Actualizar banner de modo\
                 const modeBanner = document.getElementById('mode-banner');\
-                const isHorarioLaboral = data.modo === 'Horario Laboral';\
+                const isHorarioLaboral = data.modoActivo === true;\
+                \
                 modeBanner.className = `mode-banner ${isHorarioLaboral ? 'mode-horario' : 'mode-fuera-horario'}`;\
                 modeBanner.innerHTML = isHorarioLaboral ? \
                     '🕐 HORARIO LABORAL ACTIVO<br><small>Sensores desactivados</small>' : \
                     '🚨 FUERA DE HORARIO<br><small>Sensores de seguridad activos</small>';\
+                \
+                // Actualizar estado de cada zona\
                 data.zonas.forEach((zona, index) => {\
                     const idx = index + 1;\
+                    \
+                    // Estado encendido/apagado\
                     document.getElementById(`zone-${idx}-status`).textContent = zona.activo ? 'ENCENDIDO' : 'APAGADO';\
                     document.getElementById(`zone-${idx}-status`).style.color = zona.activo ? '#4cc9f0' : '#f72585';\
+                    \
+                    // Actualizar switch sin disparar evento\
                     const switchElement = document.getElementById(`zone-${idx}-switch`);\
                     switchElement.onchange = null;\
                     switchElement.checked = zona.activo;\
                     switchElement.onchange = function() { toggleZone(index, this.checked); };\
+                    \
+                    // Actualizar countdown\
                     if (zona.countdown && zona.countdown > 0) {\
                         const countdownElement = document.getElementById(`zone-${idx}-countdown`);\
                         countdownElement.style.display = 'block';\
@@ -626,18 +698,46 @@ void manejarPaginaPrincipal()
                     } else {\
                         document.getElementById(`zone-${idx}-countdown`).style.display = 'none';\
                     }\
-                    const sensorActivo = zona.movimiento === 1;\
+                    \
+                    // Indicador visual del sensor (basado en tiempo desde último movimiento)\
+                    const tiempoSinMovimiento = zona.movimiento; // segundos desde último movimiento\
+                    const sensorActivo = tiempoSinMovimiento < 10; // Activo si hubo movimiento en últimos 10 segundos\
                     const sensor = document.getElementById(`zone-${idx}-sensor`);\
                     sensor.classList.toggle('sensor-active', sensorActivo);\
                     sensor.classList.toggle('sensor-inactive', !sensorActivo);\
+                    \
+                    // Actualizar estado de movimiento\
                     const movimientoElement = document.getElementById(`movimiento-zona-${idx}`);\
                     if (isHorarioLaboral) {\
                         movimientoElement.textContent = `Zona ${idx}: Sensor desactivado (horario laboral)`;\
                         movimientoElement.style.color = '#6c757d';\
+                        movimientoElement.style.fontWeight = 'normal';\
                     } else {\
-                        movimientoElement.textContent = `Zona ${idx}: ` + (sensorActivo ? '🔴 MOVIMIENTO DETECTADO' : '🟢 Sin movimiento');\
-                        movimientoElement.style.color = sensorActivo ? '#dc3545' : '#28a745';\
-                        movimientoElement.style.fontWeight = sensorActivo ? 'bold' : 'normal';\
+                        // Mostrar tiempo desde último movimiento\
+                        let textoMovimiento;\
+                        if (tiempoSinMovimiento >= 999999) {\
+                            textoMovimiento = 'Sin movimiento registrado';\
+                        } else if (tiempoSinMovimiento < 60) {\
+                            textoMovimiento = `Último movimiento: hace ${tiempoSinMovimiento}s`;\
+                        } else {\
+                            const minutos = Math.floor(tiempoSinMovimiento / 60);\
+                            const segundos = tiempoSinMovimiento % 60;\
+                            textoMovimiento = `Último movimiento: hace ${minutos}m ${segundos}s`;\
+                        }\
+                        \
+                        movimientoElement.textContent = `Zona ${idx}: ${textoMovimiento}`;\
+                        \
+                        // Color según qué tan reciente fue el movimiento\
+                        if (tiempoSinMovimiento < 10) {\
+                            movimientoElement.style.color = '#dc3545'; // Rojo: movimiento muy reciente\
+                            movimientoElement.style.fontWeight = 'bold';\
+                        } else if (tiempoSinMovimiento < 30) {\
+                            movimientoElement.style.color = '#f8961e'; // Naranja: movimiento reciente\
+                            movimientoElement.style.fontWeight = '600';\
+                        } else {\
+                            movimientoElement.style.color = '#28a745'; // Verde: sin movimiento\
+                            movimientoElement.style.fontWeight = 'normal';\
+                        }\
                     }\
                 });\
             });\
