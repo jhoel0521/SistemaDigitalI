@@ -4,49 +4,53 @@
 #include "time_utils.h"
 #include <Arduino.h>
 
-volatile bool pir1Disparado = false;
-volatile bool pir2Disparado = false;
-volatile unsigned long tiempoPir1 = 0;
-volatile unsigned long tiempoPir2 = 0;
+// Estados anteriores para detectar cambios (HIGH -> LOW o LOW -> HIGH)
+bool estadosAnterioresPIR[CANTIDAD_ZONAS] = {false, false};
+unsigned long ultimaLecturaPIR = 0;
 
-void IRAM_ATTR manejarPIR1()
-{
-    if (estaEnHorarioLaboral)
-        return;
-    pir1Disparado = true;
-    tiempoPir1 = millis();
-}
-
-void IRAM_ATTR manejarPIR2()
-{
-    if (estaEnHorarioLaboral)
-        return;
-    pir2Disparado = true;
-    tiempoPir2 = millis();
-}
-
+// Función mejorada que lee todos los PIR en el loop
 void procesarInterrupcionesPIR()
 {
-
-    if (estaEnHorarioLaboral)
+    // Leer PIR cada 100ms para no saturar (PIR responde lento anyway)
+    unsigned long tiempoActual = millis();
+    if (tiempoActual - ultimaLecturaPIR < 100)
     {
-        pir1Disparado = false;
-        pir2Disparado = false;
         return;
     }
-    else
+    ultimaLecturaPIR = tiempoActual;
+
+    // Si estamos en horario laboral, no procesar PIR
+    if (estaEnHorarioLaboral)
     {
-        if (pir1Disparado)
+        // Resetear estados para evitar falsas alarmas al salir de horario
+        for (int i = 0; i < CANTIDAD_ZONAS; i++)
         {
-            pir1Disparado = false;
-            zonas[0].ultimoMovimiento = tiempoPir1;
-            Serial.printf("Zona 1: Movimiento detectado en tiempo %lu ms\n", tiempoPir1);
+            estadosAnterioresPIR[i] = false;
         }
-        if (pir2Disparado)
+        return;
+    }
+
+    // Leer todos los sensores PIR
+    for (int i = 0; i < CANTIDAD_ZONAS; i++)
+    {
+        bool estadoActual = digitalRead(zonas[i].pinPir);
+
+        // Detectar transición de LOW a HIGH (nuevo movimiento)
+        if (estadoActual && !estadosAnterioresPIR[i])
         {
-            pir2Disparado = false;
-            zonas[1].ultimoMovimiento = tiempoPir2;
-            Serial.printf("Zona 2: Movimiento detectado en tiempo %lu ms\n", tiempoPir2);
+            zonas[i].ultimoMovimiento = tiempoActual;
+            Serial.printf("Zona %d: Movimiento detectado (PIR pin %d) en tiempo %lu ms\n",
+                          i + 1, zonas[i].pinPir, tiempoActual);
+
+            // Si la zona no está activa, encenderla automáticamente
+            if (!zonas[i].estaActivo)
+            {
+                zonas[i].ultimoMovimiento = tiempoActual;
+                Serial.printf("Zona %d: Se detectó movimiento, Extendiendo tiempo de actividad\n", i + 1);
+            }
         }
+
+        // Actualizar estado anterior
+        estadosAnterioresPIR[i] = estadoActual;
     }
 }

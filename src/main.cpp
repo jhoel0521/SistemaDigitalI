@@ -39,9 +39,9 @@ void setup() {
   // Iniciar el reloj interno
   referenciaDelTiempo = millis();
 
-  // Configurar interrupciones
-  attachInterrupt(digitalPinToInterrupt(zonas[0].pinPir), manejarPIR1, RISING);
-  attachInterrupt(digitalPinToInterrupt(zonas[1].pinPir), manejarPIR2, RISING);
+  // Las interrupciones PIR han sido reemplazadas por lectura en loop()
+  // Esto es más estable y eficiente para sensores PIR que tienen retardo interno
+  Serial.println("Sensores PIR configurados para lectura por polling (más estable)");
 
   // Configurar rutas del servidor web
   servidor.on("/", manejarPaginaPrincipal);
