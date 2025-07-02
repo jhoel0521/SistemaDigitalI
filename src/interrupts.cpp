@@ -9,6 +9,10 @@ bool estadosAnterioresPIR[CANTIDAD_ZONAS] = {false, false};
 unsigned long ultimaLecturaPIR = 0;
 
 // Función mejorada que lee todos los PIR en el loop
+// COMPORTAMIENTO DE AHORRO ENERGÉTICO:
+// - Durante horario laboral: PIR inactivos (control manual únicamente)
+// - Fuera de horario: PIR SOLO extienden tiempo de zonas YA ENCENDIDAS
+//   NUNCA encienden zonas apagadas para ahorrar energía
 void procesarInterrupcionesPIR()
 {
     // Leer PIR cada 100ms para no saturar (PIR responde lento anyway)
@@ -38,15 +42,20 @@ void procesarInterrupcionesPIR()
         // Detectar transición de LOW a HIGH (nuevo movimiento)
         if (estadoActual && !estadosAnterioresPIR[i])
         {
-            zonas[i].ultimoMovimiento = tiempoActual;
-            Serial.printf("Zona %d: Movimiento detectado (PIR pin %d) en tiempo %lu ms\n",
-                          i + 1, zonas[i].pinPir, tiempoActual);
-
-            // Si la zona no está activa, encenderla automáticamente
-            if (!zonas[i].estaActivo)
+            // AHORRO ENERGÉTICO: Fuera de horario, PIR SOLO extiende tiempo de zonas YA ENCENDIDAS
+            // NUNCA enciende zonas apagadas para ahorrar energía
+            if (zonas[i].estaActivo)
             {
+                // Solo si la zona YA está encendida, extender su tiempo de actividad
                 zonas[i].ultimoMovimiento = tiempoActual;
-                Serial.printf("Zona %d: Se detectó movimiento, Extendiendo tiempo de actividad\n", i + 1);
+                Serial.printf("Zona %d: Movimiento detectado (PIR pin %d) - EXTENDIENDO tiempo de zona encendida\n",
+                              i + 1, zonas[i].pinPir);
+            }
+            else
+            {
+                // Zona apagada: PIR NO la enciende para ahorrar energía
+                Serial.printf("Zona %d: Movimiento detectado (PIR pin %d) - pero zona APAGADA, NO se enciende (ahorro energético)\n",
+                              i + 1, zonas[i].pinPir);
             }
         }
 

@@ -46,8 +46,24 @@ Sistema inteligente de control de luces basado en **ESP32** que utiliza sensores
 
 ### 🤖 **Automatización Inteligente**
 - 👁️ **Sensores PIR**: Detección de movimiento por zona
-- ⚡ **Auto-encendido**: Activación automática por movimiento
+- 🔋 **Ahorro Energético**: PIR solo extiende tiempo, nunca enciende zonas apagadas fuera de horario
 - ⏱️ **Apagado Temporizado**: 5 minutos sin actividad
+- 🎛️ **Control Híbrido**: Manual durante horario laboral, automático fuera de horario
+
+### 🔋 **Sistema de Ahorro Energético**
+**Comportamiento Inteligente según Horario:**
+
+#### Durante Horario Laboral (8:00 AM - 6:00 PM):
+- ❌ **Sensores PIR inactivos** (control manual únicamente)
+- ✅ **Sin apagado automático** (no interrumpe el trabajo)
+
+#### Fuera de Horario (6:00 PM - 8:00 AM):
+- ✅ **Sensores PIR activos** con lógica de ahorro
+- ❌ **PIR NO enciende zonas apagadas** (ahorro energético)
+- ✅ **PIR extiende tiempo de zonas encendidas** (seguridad)
+- ⏰ **Apagado automático tras 5 min sin movimiento**
+
+> 📖 **Documentación completa**: Ver [COMPORTAMIENTO_AHORRO_ENERGETICO.md](./COMPORTAMIENTO_AHORRO_ENERGETICO.md)
 - 🔄 **Extensión Inteligente**: Tiempo renovado por movimiento continuo
 
 ### 🌐 **Conectividad y Control**
