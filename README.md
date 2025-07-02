@@ -5,12 +5,12 @@
   
   **Universidad Privada Domingo Savio (UPDS)**  
   **Facultad de Ingeniería**  
-  **Materia: Sistemas Digitales II**
+  **Materia: Sistemas Digitales II** (Tercer Semestre)
   
   ---
   
   **Desarrollado por:**  
-  🎓 **Jhoel** | 🎓 **Nuvia** | 🎓 **Erick** | 🎓 **Alan**
+  🎓 **Jhoel** (💻 Software) | 🎓 **Alan** (⚡ Hardware) | 🎓 **Nuvia** (🔧 Ensamblado) | 🎓 **Erick** (📋 Documentación)
   
   🌐 [www.upds.edu.bo](https://www.upds.edu.bo/)
 </div>
@@ -452,7 +452,14 @@ POST /update     // Actualizar horarios
 2. **Experiencia Real**: Sistema aplicable en entornos reales
 3. **Tecnologías Modernas**: ESP32, WebSocket, responsive design
 4. **Metodología**: Testing, documentación, versionado
-5. **Trabajo en Equipo**: Desarrollo colaborativo, roles definidos
+5. **Trabajo en Equipo Efectivo**: Roles especializados y coordinados
+
+### 🤝 **Contribuciones del Equipo**
+
+- **💻 Jhoel (Software)**: Desarrollo completo del código, arquitectura del sistema, implementación de funcionalidades
+- **⚡ Alan (Hardware)**: Diseño de circuitos, prototipado, pruebas físicas, validación de conexiones
+- **🔧 Nuvia (Ensamblado)**: Montaje profesional, conexiones físicas, integración hardware-software
+- **📋 Erick (Documentación)**: Informe técnico, presentación, manual de usuario, documentación académica
 
 ### 🚀 **Competencias Desarrolladas**
 
@@ -483,16 +490,16 @@ POST /update     // Actualizar horarios
 📧 **Email**: [email institucional]
 
 ### 👥 **Equipo de Desarrollo**
-- 🎓 **Jhoel** - [Rol/Especialidad]
-- 🎓 **Nuvia** - [Rol/Especialidad]  
-- 🎓 **Erick** - [Rol/Especialidad]
-- 🎓 **Alan** - [Rol/Especialidad]
+- 🎓 **Jhoel** - 💻 **Desarrollo de Software** (Programación completa del sistema)
+- 🎓 **Alan** - ⚡ **Diseño de Circuitos** (Prototipado y pruebas físicas)
+- 🎓 **Nuvia** - 🔧 **Ensamblado** (Montaje y conexiones del hardware)
+- 🎓 **Erick** - 📋 **Documentación** (Informe técnico y presentación)
 
 ### 📚 **Materia**
-**Sistemas Digitales II**  
-👨‍🏫 **Docente**: [Nombre del profesor]  
-📅 **Período**: [Semestre/Año]  
-🏆 **Calificación**: [Si aplica]
+**Sistemas Digitales II** (Tercer Semestre)  
+👨‍🏫 **Docente**: Alex Elder Escobar Peralta  
+📅 **Período**: 2025  
+🏆 **Calificación**: Pendiente (En evaluación)
 
 ---
 
@@ -501,7 +508,8 @@ POST /update     // Actualizar horarios
 Este proyecto es desarrollado con fines **académicos y educativos** para la Universidad Privada Domingo Savio (UPDS). 
 
 **© 2025 - Equipo de Desarrollo UPDS**  
-*Sistemas Digitales II - Ingeniería en Sistemas*
+*Sistemas Digitales II - Ingeniería en Sistemas - Tercer Semestre*  
+**Docente**: Alex Elder Escobar Peralta
 
 ---
 
@@ -509,7 +517,8 @@ Este proyecto es desarrollado con fines **académicos y educativos** para la Uni
   
   **¡Gracias por revisar nuestro proyecto!** 🎉
   
-  *Desarrollado con ❤️ por estudiantes de UPDS*
+  *Desarrollado con ❤️ por estudiantes de UPDS*  
+  **Jhoel** 💻 | **Alan** ⚡ | **Nuvia** 🔧 | **Erick** 📋
   
   [![UPDS](https://img.shields.io/badge/UPDS-Universidad%20Privada%20Domingo%20Savio-blue?style=for-the-badge)](https://www.upds.edu.bo/)
   [![ESP32](https://img.shields.io/badge/ESP32-Arduino-red?style=for-the-badge)](https://www.arduino.cc/)
