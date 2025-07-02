@@ -64,7 +64,7 @@ void enviarEstadoPorSocketWeb()
         objetoZona["tiempoEncendido"] = zonas[i].tiempoEncendido > 0 ? (millis() - zonas[i].tiempoEncendido) / 1000 : 0; // Tiempo desde que se encendió
         objetoZona["sensorActual"] = digitalRead(zonas[i].pinPir);                                                       // Estado actual del sensor PIR
         // Calcular countdown si está activo
-        if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0)
+        if (zonas[i].estaActivo && zonas[i].ultimoMovimiento > 0)
         {
             unsigned long tiempoRestante = 0;
 
@@ -75,26 +75,17 @@ void enviarEstadoPorSocketWeb()
             }
             else
             {
-                // FUERA DE HORARIO: Sistema de seguridad con countdown
-                bool hayMovimientoGlobal = false;
-                for (int j = 0; j < 2; j++)
-                {
-                    if ((millis() - zonas[j].ultimoMovimiento) <= 30000)
-                    {
-                        hayMovimientoGlobal = true;
-                        break;
-                    }
-                }
-
-                if (!hayMovimientoGlobal)
+                // FUERA DE HORARIO: Sistema de seguridad con countdown individual por zona
+                unsigned long tiempoSinMovimientoZona = millis() - zonas[i].ultimoMovimiento;
+                
+                if (tiempoSinMovimientoZona >= TIEMPO_MAXIMO_ENCENDIDO)
                 {
                     tiempoRestante = 0; // Se apagará inmediatamente
                 }
                 else
                 {
-                    // Hay movimiento: countdown desde activación
-                    unsigned long tiempoTranscurrido = millis() - zonas[i].tiempoEncendido;
-                    tiempoRestante = (TIEMPO_MAXIMO_ENCENDIDO > tiempoTranscurrido) ? (TIEMPO_MAXIMO_ENCENDIDO - tiempoTranscurrido) / 1000 : 0;
+                    // Calcular tiempo restante hasta apagado (5 minutos desde último movimiento)
+                    tiempoRestante = (TIEMPO_MAXIMO_ENCENDIDO - tiempoSinMovimientoZona) / 1000;
                 }
             }
 

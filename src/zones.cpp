@@ -40,7 +40,6 @@ void configurarEstadoZona(int indiceZona, bool activar)
 
 void controlarApagadoAutomatico()
 {
-
     unsigned long tiempoActual = millis();
 
     if (estaEnHorarioLaboral)
@@ -49,50 +48,20 @@ void controlarApagadoAutomatico()
         // Las luces permanecen encendidas para permitir el trabajo sin interrupciones
         return; // No hacer nada durante horario laboral
     }
-    else
+    
+    // FUERA DE HORARIO: Control independiente por zona
+    // Cada zona se controla de forma independiente según su propio movimiento
+    for (int i = 0; i < CANTIDAD_ZONAS; i++)
     {
-        // FUERA DE HORARIO: Sistema de seguridad - Lógica principal de control
-        bool hayMovimientoGlobal = false;
-
-        // Verificar si hay movimiento reciente en cualquier zona
-        for (int i = 0; i < 2; i++)
+        if (zonas[i].estaActivo)  // Solo verificar zonas que están encendidas
         {
-            if ((tiempoActual - zonas[i].ultimoMovimiento) <= TIEMPO_MAXIMO_ENCENDIDO)
+            unsigned long tiempoSinMovimiento = tiempoActual - zonas[i].ultimoMovimiento;
+            
+            // Si esta zona específica excede 5 minutos sin movimiento, apagarla
+            if (tiempoSinMovimiento > TIEMPO_MAXIMO_ENCENDIDO)
             {
-                hayMovimientoGlobal = true;
-                break;
-            }
-        }
-
-        // Si NO hay movimiento global, apagar TODAS las zonas
-        if (!hayMovimientoGlobal)
-        {
-            // se apagan todas las zonas
-            for (int i = 0; i < 2; i++)
-            {
-                if (zonas[i].estaActivo)
-                {
-                    configurarEstadoZona(i, false);
-                    Serial.printf("Zona %d apagada por falta de movimiento (fuera de horario)\n", i + 1);
-                }
-            }
-        }
-        else
-        {
-            // HAY movimiento: mantener countdown individual
-            for (int i = 0; i < 2; i++)
-            {
-                if (zonas[i].estaActivo && zonas[i].tiempoEncendido > 0)
-                {
-                    unsigned long tiempoEncendido = tiempoActual - zonas[i].tiempoEncendido;
-
-                    // Apagar si excede el tiempo máximo (5 minutos)
-                    if (tiempoEncendido > TIEMPO_MAXIMO_ENCENDIDO)
-                    {
-                        configurarEstadoZona(i, false);
-                        Serial.printf("Zona %d apagada por timeout máximo (5 min) - fuera de horario\n", i + 1);
-                    }
-                }
+                configurarEstadoZona(i, false);
+                Serial.printf("Zona %d apagada por timeout (5 min sin movimiento) - fuera de horario\n", i + 1);
             }
         }
     }
