@@ -487,7 +487,7 @@ POST /update     // Actualizar horarios
 **Universidad Privada Domingo Savio (UPDS)**  
 📍 **Dirección**: [Dirección de la universidad]  
 🌐 **Web**: [www.upds.edu.bo](https://www.upds.edu.bo/)  
-📧 **Email**: [email institucional]
+📧 **Email**: [infoupds.santacruz@upds.edu.bo](mailto:infoupds.santacruz@upds.edu.bo)
 
 ### 👥 **Equipo de Desarrollo**
 - 🎓 **Jhoel** - 💻 **Desarrollo de Software** (Programación completa del sistema)
