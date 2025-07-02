@@ -7,13 +7,13 @@
 #include <WiFi.h>
 
 WebServer servidor(80);
+bool sincronizacionAutomaticaHora = false;
 
 // Variable para cantidadHorarios
 const int cantidadHorarios = CANTIDAD_HORARIOS;
-
 // Definir constante si no está disponible
 #ifndef CONTENT_LENGTH_UNKNOWN
-#define CONTENT_LENGTH_UNKNOWN ((size_t) -1)
+#define CONTENT_LENGTH_UNKNOWN ((size_t)-1)
 #endif
 
 void manejarPaginaPrincipal()
@@ -125,7 +125,8 @@ void manejarPaginaPrincipal()
     servidor.sendContent_P(PSTR("<form action=\"/settime\" method=\"post\" style=\"margin-top:15px;\">"));
     servidor.sendContent_P(PSTR("<div class=\"form-group\"><label>Hora actual (HH:MM):</label>"));
     servidor.sendContent_P(PSTR("<input type=\"text\" name=\"time\" id=\"manual-time\" placeholder=\"HH:MM\"></div>"));
-    servidor.sendContent_P(PSTR("<button type=\"submit\" class=\"btn btn-primary\" style=\"width:100%;\">Establecer Hora</button></form></div></div>"));
+    servidor.sendContent_P(PSTR("<button type=\"submit\" class=\"btn btn-primary\" style=\"width:100%;margin-bottom:10px;\">Establecer Hora Manualmente</button></form>"));
+    servidor.sendContent_P(PSTR("<button onclick=\"syncTimeAutomatically(false)\" class=\"btn btn-primary\" style=\"width:100%;background-color:#28a745;\">Sincronizar con Navegador</button></div></div>"));
 
     // Fragmento 6: JavaScript
     enviarJavaScript();
@@ -146,7 +147,7 @@ void enviarJavaScript()
     servidor.sendContent_P(PSTR("socket.addEventListener('open',()=>{"));
     servidor.sendContent_P(PSTR("connectionDot.classList.remove('disconnected');"));
     servidor.sendContent_P(PSTR("connectionDot.classList.add('connected');"));
-    servidor.sendContent_P(PSTR("connectionStatus.textContent='Conectado';syncTimeAutomatically();});"));
+    servidor.sendContent_P(PSTR("connectionStatus.textContent='Conectado';syncTimeAutomatically(true);});"));
 
     servidor.sendContent_P(PSTR("socket.addEventListener('message',(event)=>{"));
     servidor.sendContent_P(PSTR("const data=JSON.parse(event.data);"));
@@ -222,11 +223,17 @@ void enviarJavaScript()
     servidor.sendContent_P(PSTR("fetch(url).then(response=>{if(!response.ok){console.error('Error al cambiar estado de zona');}})"));
     servidor.sendContent_P(PSTR(".catch(err=>{console.error('Error:',err);});}"));
 
-    servidor.sendContent_P(PSTR("function syncTimeAutomatically(){"));
+    servidor.sendContent_P(PSTR("function syncTimeAutomatically(isAutomatic){"));
+    servidor.sendContent_P(PSTR("if(isAutomatic){"));
+    servidor.sendContent_P(PSTR("if(window.timeSyncedAutomatically){"));
+    servidor.sendContent_P(PSTR("console.log('Sincronización automática ya realizada, omitiendo...');return;}"));
+    servidor.sendContent_P(PSTR("window.timeSyncedAutomatically=true;}"));
     servidor.sendContent_P(PSTR("const now=new Date();"));
     servidor.sendContent_P(PSTR("const timeString=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;"));
+    servidor.sendContent_P(PSTR("const syncType=isAutomatic?'automática':'manual';"));
     servidor.sendContent_P(PSTR("fetch('/settime',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},"));
-    servidor.sendContent_P(PSTR("body:`time=${timeString}`}).then(()=>{console.log('Hora sincronizada automáticamente:',timeString);})"));
+    servidor.sendContent_P(PSTR("body:`time=${timeString}&auto=${isAutomatic?1:0}`}).then(()=>{"));
+    servidor.sendContent_P(PSTR("console.log(`Hora sincronizada ${syncType}mente:`,timeString);})"));
     servidor.sendContent_P(PSTR(".catch(err=>{console.error('Error sincronizando hora:',err);});}"));
     servidor.sendContent_P(PSTR("</script>"));
 }
@@ -297,14 +304,30 @@ void manejarConfiguracionHora()
     if (servidor.hasArg("time"))
     {
         String cadenaHora = servidor.arg("time");
+        bool esAutomatico = servidor.hasArg("auto") && servidor.arg("auto") == "1";
+
         int hora, minuto;
         if (sscanf(cadenaHora.c_str(), "%d:%d", &hora, &minuto) == 2)
         {
+            if (sincronizacionAutomaticaHora && esAutomatico)
+            {
+                Serial.println("Sincronización automática ya realizada, omitiendo...");
+                return;
+            }
             horaActual = hora;
             minutoActual = minuto;
             segundoActual = 0;
             referenciaDelTiempo = millis();
-            Serial.printf("Hora actualizada: %02d:%02d\n", hora, minuto);
+
+            if (esAutomatico)
+            {
+                sincronizacionAutomaticaHora = true;
+                Serial.printf("Hora sincronizada automáticamente: %02d:%02d\n", hora, minuto);
+            }
+            else
+            {
+                Serial.printf("Hora actualizada manualmente: %02d:%02d\n", hora, minuto);
+            }
         }
     }
     servidor.sendHeader("Location", "/");
