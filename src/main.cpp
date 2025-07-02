@@ -3,6 +3,8 @@
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
+#include <ESPmDNS.h>  // Para dominio personalizado
+#include <DNSServer.h>  // Para captive portal
 #include "config.h"
 #include "zones.h"
 #include "mi_webserver.h"
@@ -13,6 +15,10 @@
 // Variables para mejorar sincronización WebSocket
 unsigned long ultimaActualizacionSensor = 0;
 bool estadoSensoresAnterior[CANTIDAD_ZONAS] = {false, false};
+
+// DNS Server para dominio personalizado
+DNSServer dnsServer;
+const byte DNS_PORT = 53;
 
 void setup() {
   delay(2000);
@@ -36,6 +42,27 @@ void setup() {
   Serial.print("IP: ");
   Serial.println(WiFi.softAPIP());
 
+  // 🏠 CONFIGURAR DOMINIO PERSONALIZADO
+  Serial.println("\n🏠 === CONFIGURANDO DOMINIO PERSONALIZADO ===");
+  
+  // mDNS para http://micasita.local
+  if (MDNS.begin("micasita")) {
+    Serial.println("✅ mDNS configurado exitosamente");
+    Serial.println("📡 Acceso via: http://micasita.local");
+    MDNS.addService("http", "tcp", 80);
+    MDNS.addService("ws", "tcp", 81);
+  } else {
+    Serial.println("❌ Error configurando mDNS");
+  }
+  
+  // DNS Server para capturar http://micasita.com
+  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+  Serial.println("✅ DNS Server iniciado (Captive Portal)");
+  Serial.println("🌐 Acceso via: http://micasita.com");
+  Serial.println("🌐 También via: http://cualquier-nombre.com");
+  Serial.printf("🌐 IP directa: http://%s\n", WiFi.softAPIP().toString().c_str());
+  Serial.println("===========================================\n");
+
   // Iniciar el reloj interno
   referenciaDelTiempo = millis();
 
@@ -49,7 +76,27 @@ void setup() {
   servidor.on("/off", manejarControlManual);
   servidor.on("/update", HTTP_POST, manejarActualizacionHorarios);
   servidor.on("/settime", HTTP_POST, manejarConfiguracionHora);
-  servidor.onNotFound(manejarPaginaNoEncontrada);
+  
+  // Captive Portal: Redirigir cualquier dominio no reconocido
+  servidor.onNotFound([]() {
+    String host = servidor.hostHeader();
+    Serial.printf("📥 Petición de host: %s\n", host.c_str());
+    
+    // Lista de dominios válidos
+    if (host == "micasita.com" || 
+        host == "micasita.local" || 
+        host == WiFi.softAPIP().toString() ||
+        host == "192.168.4.1") {
+      // Dominio válido, servir página principal
+      manejarPaginaPrincipal();
+    } else {
+      // Dominio no reconocido, redirigir a micasita.com
+      String redirect = "http://micasita.com";
+      servidor.sendHeader("Location", redirect);
+      servidor.send(302, "text/plain", "Redirigiendo a MiCasita...");
+      Serial.printf("🔄 Redirigiendo %s -> %s\n", host.c_str(), redirect.c_str());
+    }
+  });
 
   // Iniciar servidor WebSocket
   socketWeb.begin();
@@ -75,6 +122,10 @@ void loop() {
   servidor.handleClient();
   socketWeb.loop();
   actualizarRelojInterno();
+  
+  // Mantener servicios de dominio personalizado activos
+  dnsServer.processNextRequest();  // Captive Portal
+  // Nota: MDNS no necesita update() en ESP32 Arduino
 
   // Actualizar modo horario
   bool nuevoModoHorario = verificarSiEsHorarioLaboral();

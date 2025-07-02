@@ -193,9 +193,37 @@ El sistema crea un punto de acceso WiFi:
 
 ### 🌐 **Acceso a la Interfaz Web**
 
-1. Conectar dispositivo a la red WiFi `SistemaDigitales`
-2. Abrir navegador en: `http://192.168.4.1`
-3. La interfaz se carga automáticamente
+#### 🏠 **Dominios Personalizados Disponibles:**
+
+**Opción 1 - Dominio Principal:**
+- 🌐 **http://micasita.com** (Fácil de recordar)
+- 📱 **http://micasita.local** (Protocolo mDNS)
+
+**Opción 2 - Acceso Directo:**
+- 🔧 **http://192.168.4.1** (IP del ESP32)
+
+#### 📋 **Pasos de Acceso:**
+
+1. **Conectar dispositivo** a la red WiFi `SistemaDigitales`
+2. **Abrir navegador** en cualquiera de los dominios:
+   - `http://micasita.com` ← **Recomendado**
+   - `http://micasita.local`
+   - `http://192.168.4.1`
+3. **La interfaz se carga automáticamente**
+
+#### 🔧 **Tecnología del Dominio:**
+
+- **Captive Portal**: Cualquier URL redirige al sistema
+- **mDNS**: Resolución de nombres local
+- **DNS Server**: Captura todos los dominios
+- **Auto-redirección**: URLs desconocidas → `micasita.com`
+
+#### 🎯 **Ventajas:**
+
+- ✅ **Fácil acceso**: No necesitas recordar IPs
+- ✅ **Múltiples opciones**: Varios dominios funcionan
+- ✅ **Auto-redirección**: Cualquier URL funciona
+- ✅ **Compatible**: Funciona en móviles y desktop
 
 ---
 

@@ -236,6 +236,27 @@ void enviarJavaScript()
     servidor.sendContent_P(PSTR("console.log(`Hora sincronizada ${syncType}mente:`,timeString);})"));
     servidor.sendContent_P(PSTR(".catch(err=>{console.error('Error sincronizando hora:',err);});}"));
     servidor.sendContent_P(PSTR("</script>"));
+    
+    // Footer con información de dominios disponibles
+    servidor.sendContent_P(PSTR("<div class=\"card\" style=\"margin-top:15px;background:linear-gradient(135deg,#f8f9fa,#e9ecef);border:2px solid #dee2e6;\">"));
+    servidor.sendContent_P(PSTR("<div class=\"card-header\"><h3 class=\"card-title\">🏠 Dominios de Acceso</h3></div>"));
+    servidor.sendContent_P(PSTR("<div style=\"font-size:0.9rem;line-height:1.4;\">"));
+    servidor.sendContent_P(PSTR("<p><strong>🌐 Acceso Principal:</strong></p>"));
+    servidor.sendContent_P(PSTR("<ul style=\"margin-left:20px;margin-bottom:10px;\">"));
+    servidor.sendContent_P(PSTR("<li><a href=\"http://micasita.com\" style=\"color:var(--primary);text-decoration:none;font-weight:600;\">http://micasita.com</a> 🏡</li>"));
+    servidor.sendContent_P(PSTR("<li><a href=\"http://micasita.local\" style=\"color:var(--primary);text-decoration:none;font-weight:600;\">http://micasita.local</a> 📱</li>"));
+    servidor.sendContent_P(PSTR("</ul>"));
+    servidor.sendContent_P(PSTR("<p><strong>🔧 Acceso Directo:</strong></p>"));
+    servidor.sendContent_P(PSTR("<ul style=\"margin-left:20px;\">"));
+    servidor.sendContent_P(PSTR("<li><a href=\"http://192.168.4.1\" style=\"color:var(--secondary);text-decoration:none;\">http://192.168.4.1</a> (IP ESP32)</li>"));
+    servidor.sendContent_P(PSTR("</ul>"));
+    servidor.sendContent_P(PSTR("<p style=\"margin-top:10px;font-size:0.8rem;color:#6c757d;\">"));
+    servidor.sendContent_P(PSTR("💡 <strong>Tip:</strong> Todos los dominios redirigen al mismo sistema. "));
+    servidor.sendContent_P(PSTR("Usa <strong>micasita.com</strong> para fácil recordación."));
+    servidor.sendContent_P(PSTR("</p></div></div>"));
+    
+    servidor.sendContent_P(PSTR("</div></body></html>"));
+    servidor.sendContent("");
 }
 
 void manejarPaginaNoEncontrada()
