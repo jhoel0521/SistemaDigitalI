@@ -271,39 +271,56 @@ El sistema crea un punto de acceso WiFi:
 
 ## 🧪 **Testing y Validación**
 
-### 🔬 **Tests Unitarios Implementados**
+### � **Validación Manual del Sistema**
 
-#### **1. Test de Control Remoto**
-```bash
-pio test -f test_control_remoto
-```
-- ✅ Encendido remoto via HTTP GET `/on?zona=0`
-- ✅ Apagado remoto via HTTP GET `/off?zona=0`
-- ✅ Control independiente de múltiples zonas
-- ✅ Verificación de estado de relays
+Dado que este es un sistema embebido que interactúa con hardware real, la validación principal se realiza de forma manual en el dispositivo:
 
-#### **2. Test de Extensión por Movimiento**
-```bash
-pio test -f test_extension_movimiento
-```
-- ✅ Activación automática por sensor fuera de horario
-- ✅ Extensión de tiempo por movimiento continuo
-- ✅ Comportamiento diferencial horario vs fuera de horario
-- ✅ Verificación de tiempos exactos
+#### ✅ **Funcionalidades Validadas:**
 
-#### **3. Test de Apagado Automático**
-```bash
-pio test -f test_apagado_5min
-```
-- ✅ Apagado automático 5 minutos después del fin de horario
-- ✅ Mantenimiento durante horario laboral
-- ✅ Control diferencial de múltiples zonas
-- ✅ Transiciones exactas de horario
+**1. Control Manual (Horario Laboral):**
+- ✅ Encendido/apagado via interfaz web funcionando
+- ✅ Control independiente por zona (cada zona se maneja por separado)
+- ✅ Sensores PIR desactivados durante horario laboral
+- ✅ Sin apagado automático durante trabajo
 
-### 🏃‍♂️ **Ejecutar Todos los Tests**
-```bash
-pio test
-```
+**2. Control Automático (Fuera de Horario):**
+- ✅ PIR SOLO extiende tiempo de zonas ya encendidas (ahorro energético)
+- ✅ PIR NO enciende zonas apagadas fuera de horario
+- ✅ Apagado automático individual por zona tras 5 min sin movimiento
+- ✅ **CORREGIDO**: Cronómetros se resetean correctamente al detectar movimiento
+
+**3. Interfaz Web en Tiempo Real:**
+- ✅ Comunicación WebSocket bidireccional
+- ✅ Actualización en tiempo real de estados
+- ✅ **CORREGIDO**: Countdown individual por zona (no global)
+- ✅ Dominios personalizados: http://micasita.com, http://micasita.local
+
+**4. Correcciones Implementadas:**
+- 🔧 **SOLUCIONADO**: Apagado independiente por zona (antes se apagaban todas cuando una llegaba a 5 min)
+- 🔧 **SOLUCIONADO**: Cronómetros de countdown se actualizan correctamente en la interfaz web
+- 🔧 **SOLUCIONADO**: Cada zona se controla individualmente según su propio movimiento
+
+#### 🔬 **Tests de Desarrollo (Código Fuente):**
+
+Los tests unitarios están disponibles en la carpeta `test/` para referencia de desarrollo:
+- `test_calibrar_pir/`: Validación de configuración de pines
+- `test_control_manual/`: Tests de control remoto
+- `test_ahorro_energetico/`: Validación de comportamiento energético
+- `test_apagado_automatico/`: Tests de apagado temporizado
+
+**Nota**: Los tests están diseñados para referencia de desarrollo. La validación principal se realiza en hardware real.
+
+#### 📋 **Procedimiento de Validación Recomendado:**
+
+1. **Compilar y subir firmware**:
+   ```bash
+   C:\Users\ESTE-PC-01\.platformio\penv\Scripts\platformio.exe run --target upload
+   ```
+2. **Conectarse al WiFi**: `SistemaDigitales` (password: `12345678`)
+3. **Acceder a interfaz**: http://micasita.com
+4. **Validar horario laboral**: Control manual, PIR inactivos
+5. **Validar fuera de horario**: PIR extiende tiempo, apagado automático
+6. **Verificar cronómetros**: Se resetean al detectar movimiento
 
 ---
 
