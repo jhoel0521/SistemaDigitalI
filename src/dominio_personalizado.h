@@ -3,6 +3,7 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <ESPmDNS.h>
+#include "mi_webserver.h"
 
 // Configuración DNS personalizado
 DNSServer dnsServer;
@@ -32,12 +33,11 @@ public:
     
     static void actualizar() {
         dnsServer.processNextRequest();
-        MDNS.update();
     }
     
     static void manejarDominioPersonalizado(WebServer& servidor) {
         // Interceptar todas las peticiones y redirigir si es necesario
-        servidor.onNotFound([]() {
+        servidor.onNotFound([&servidor]() {
             String host = servidor.hostHeader();
             Serial.printf("Petición recibida de host: %s\n", host.c_str());
             
